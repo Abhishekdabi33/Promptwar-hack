@@ -38,7 +38,8 @@ export default function ExportBar({
     setTimeout(() => setCopiedHash(null), 2000);
   };
 
-  const displayExt = activeFormat === 'text' ? 'txt' : (activeFormat || 'txt');
+  const cleanExt = (activeFormat || 'txt').trim().toLowerCase().replace(/^\./, '');
+  const displayExt = cleanExt === 'text' ? 'txt' : (cleanExt || 'txt');
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 px-4 py-2.5 shadow-2xs mb-6">

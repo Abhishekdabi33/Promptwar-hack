@@ -6,7 +6,14 @@ import {
   Eye, 
   FileText, 
   Table2, 
-  ShieldCheck
+  ShieldCheck,
+  ClipboardPaste,
+  UploadCloud,
+  Trash2,
+  FileCode,
+  FileSpreadsheet,
+  FileCheck,
+  Edit3
 } from 'lucide-react';
 import TablePreview from './TablePreview';
 import { parseDelimitedTextToMatrix } from '../utils/fileHandlers';
@@ -26,6 +33,12 @@ interface DiffWorkspaceProps {
   onCopySanitized: () => void;
   isCopied: boolean;
   tableMatrix?: string[][];
+  onPasteClipboard?: () => void;
+  onTriggerUpload?: () => void;
+  onClearInput?: () => void;
+  onLoadSample?: (sampleType: string) => void;
+  onDropFiles?: (files: FileList | File[]) => void;
+  isDragging?: boolean;
 }
 
 export default function DiffWorkspace({
@@ -41,12 +54,19 @@ export default function DiffWorkspace({
   currentEntityIndex,
   onCopySanitized,
   isCopied,
-  tableMatrix
+  tableMatrix,
+  onPasteClipboard,
+  onTriggerUpload,
+  onClearInput,
+  onLoadSample,
+  onDropFiles,
+  isDragging = false
 }: DiffWorkspaceProps) {
   const [viewMode, setViewMode] = useState<'edit' | 'inspect'>('inspect');
   const [showTablePreview, setShowTablePreview] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<PIIMatch | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [isLocalDrag, setIsLocalDrag] = useState(false);
 
   const unifiedScrollRef = useRef<HTMLDivElement>(null);
 
@@ -147,7 +167,7 @@ export default function DiffWorkspace({
     const lineMatches = (matchesByLine.get(lineNo) || []).slice().sort((a, b) => a.start - b.start);
     if (lineMatches.length === 0) {
       return (
-        <span className="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words break-all">
+        <span className="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
           {lineText || ' '}
         </span>
       );
@@ -170,7 +190,7 @@ export default function DiffWorkspace({
     occurrences.forEach((occ, i) => {
       if (occ.start > lastEnd) {
         segments.push(
-          <span key={`raw_plain_${i}`} className="whitespace-pre-wrap break-words break-all">
+          <span key={`raw_plain_${i}`} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
             {lineText.slice(lastEnd, occ.start)}
           </span>
         );
@@ -195,14 +215,14 @@ export default function DiffWorkspace({
 
     if (lastEnd < lineText.length) {
       segments.push(
-        <span key="raw_plain_end" className="whitespace-pre-wrap break-words break-all">
+        <span key="raw_plain_end" className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
           {lineText.slice(lastEnd)}
         </span>
       );
     }
 
     return (
-      <span className="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words break-all">
+      <span className="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
         {segments}
       </span>
     );
@@ -212,7 +232,7 @@ export default function DiffWorkspace({
     const lineMatches = (matchesByLine.get(lineNo) || []).slice().sort((a, b) => a.start - b.start);
     if (lineMatches.length === 0) {
       return (
-        <span className="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words break-all">
+        <span className="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
           {lineText || ' '}
         </span>
       );
@@ -239,7 +259,7 @@ export default function DiffWorkspace({
     occurrences.forEach((occ, i) => {
       if (occ.start > lastEnd) {
         segments.push(
-          <span key={`san_plain_${i}`} className="whitespace-pre-wrap break-words break-all">
+          <span key={`san_plain_${i}`} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
             {lineText.slice(lastEnd, occ.start)}
           </span>
         );
@@ -265,14 +285,14 @@ export default function DiffWorkspace({
 
     if (lastEnd < lineText.length) {
       segments.push(
-        <span key="san_plain_end" className="whitespace-pre-wrap break-words break-all">
+        <span key="san_plain_end" className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
           {lineText.slice(lastEnd)}
         </span>
       );
     }
 
     return (
-      <span className="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words break-all">
+      <span className="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
         {segments}
       </span>
     );
@@ -285,204 +305,362 @@ export default function DiffWorkspace({
     return null;
   }, [tableMatrix, isTabular, sanitizedText, activeFormat]);
 
+  const isEmpty = !rawText || rawText.trim() === '';
+
   return (
     <div className="relative mb-5">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden flex flex-col">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 py-2.5 border-b border-slate-200 bg-slate-50/70 gap-2.5">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5 whitespace-nowrap">
-              <FileText className="w-3.5 h-3.5 text-indigo-600" />
-              <span>{activeFile?.name || 'Raw Document Stream'}</span>
-            </span>
-            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold uppercase bg-slate-200/80 text-slate-700 whitespace-nowrap">
-              {activeFormat === 'text' ? 'txt' : activeFormat}
-            </span>
-            {activeFile?.size && (
-              <span className="text-[10px] text-slate-400 whitespace-nowrap">
-                ({(activeFile.size / 1024).toFixed(1)} KB)
+      <div
+        onClick={onTriggerUpload}
+        onDragOver={(e) => { e.preventDefault(); setIsLocalDrag(true); }}
+        onDragLeave={() => setIsLocalDrag(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsLocalDrag(false);
+          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            onDropFiles?.(e.dataTransfer.files);
+          }
+        }}
+        className={`mb-2.5 px-3 py-1.5 rounded-xl border border-dashed transition-all cursor-pointer flex items-center justify-between gap-2 text-xs select-none ${
+          isLocalDrag || isDragging
+            ? 'border-indigo-500 bg-indigo-50/90 shadow-md ring-2 ring-indigo-400'
+            : 'border-slate-300 bg-slate-50/70 hover:bg-slate-100 hover:border-slate-400 text-slate-600'
+        }`}
+        title="Click to browse files or drop files anywhere"
+      >
+        <div className="flex items-center gap-2">
+          <UploadCloud className="w-4 h-4 text-indigo-600 flex-shrink-0 animate-pulse" />
+          <span className="font-medium text-slate-800">
+            Drop files anywhere or click to browse:
+          </span>
+          <div className="hidden sm:flex items-center gap-1">
+            {['TXT', 'CSV', 'XLSX', 'JSON', 'XML', 'DOCX', 'PDF', 'EML'].map((fmt) => (
+              <span
+                key={fmt}
+                className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-white border border-slate-200 text-slate-700 shadow-2xs"
+              >
+                .{fmt.toLowerCase()}
               </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex bg-slate-200/80 p-0.5 rounded-lg border border-slate-300/60">
-              <button
-                onClick={() => setViewMode('edit')}
-                className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md transition-all whitespace-nowrap cursor-pointer ${
-                  viewMode === 'edit'
-                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Code className="w-3 h-3" />
-                <span>Raw Editor</span>
-              </button>
-              <button
-                onClick={() => setViewMode('inspect')}
-                className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md transition-all whitespace-nowrap cursor-pointer ${
-                  viewMode === 'inspect'
-                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Eye className="w-3 h-3 text-indigo-600" />
-                <span>X-Ray Inspect</span>
-              </button>
-            </div>
-
-            {isTabular && (
-              <button
-                onClick={() => setShowTablePreview(!showTablePreview)}
-                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border transition-all whitespace-nowrap cursor-pointer ${
-                  showTablePreview
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs font-bold'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                <Table2 className="w-3 h-3" />
-                <span>Table Grid</span>
-              </button>
-            )}
-
-            <button
-              onClick={onCopySanitized}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors whitespace-nowrap cursor-pointer"
-            >
-              {isCopied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-emerald-700 font-bold">Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Copy Clean Text</span>
-                </>
-              )}
-            </button>
+            ))}
           </div>
         </div>
+        <span className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 whitespace-nowrap">
+          Browse Files &rarr;
+        </span>
+      </div>
 
-        {showTablePreview && matrixData ? (
-          <div className="p-3 bg-slate-50/50 min-h-[480px]">
-            <TablePreview matrix={matrixData} />
-          </div>
-        ) : (
-          <div className="flex h-[540px] overflow-hidden">
-            <div 
-              ref={unifiedScrollRef}
-              className="flex-1 overflow-y-auto divide-y divide-slate-100"
-            >
-              <div className="sticky top-0 z-10 grid grid-cols-2 divide-x divide-slate-200 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 shadow-2xs">
-                <div className="px-3.5 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  <span>Original Untrusted Stream</span>
-                  <span>{rawLines.length} lines</span>
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden flex flex-col">
+        {isEmpty ? (
+          <div className="p-6 flex flex-col items-center justify-center min-h-[460px] bg-slate-50/30">
+            <div className="w-full max-w-2xl bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col gap-5">
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto mb-2.5">
+                  <ShieldCheck className="w-6 h-6 text-indigo-600" />
                 </div>
-                <div className="px-3.5 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100/95">
-                  <span className="text-emerald-700 flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    Sanitized Zero-Leakage Stream
-                  </span>
-                  <span>{sanitizedLines.length} lines</span>
+                <h3 className="text-base font-bold text-slate-900">
+                  Ready for Local Zero-Leakage Sanitization
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                  Paste raw sensitive text, drop any document or spreadsheet, or load one of our noisy test dossiers to test PII detection.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs text-slate-500 font-semibold px-1">
+                  <span>Quick-Load Noisy Datasets</span>
+                  <span className="text-[11px] text-slate-400 font-normal">Real PII + false-positive checksum traps</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    onClick={() => onLoadSample?.('mixed')}
+                    className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-indigo-50/60 hover:border-indigo-300 transition-all text-left cursor-pointer group"
+                  >
+                    <FileText className="w-4 h-4 text-indigo-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">Incident Dossier</div>
+                      <div className="text-[10px] text-slate-400 font-mono">.txt (PAN, Aadhaar, Cards)</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => onLoadSample?.('json')}
+                    className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-indigo-50/60 hover:border-indigo-300 transition-all text-left cursor-pointer group"
+                  >
+                    <FileCode className="w-4 h-4 text-blue-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">API Event Log</div>
+                      <div className="text-[10px] text-slate-400 font-mono">.json (JWT, Secrets, IPs)</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => onLoadSample?.('csv')}
+                    className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-indigo-50/60 hover:border-indigo-300 transition-all text-left cursor-pointer group"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">Customer Table</div>
+                      <div className="text-[10px] text-slate-400 font-mono">.csv (Tabular Ledgers)</div>
+                    </div>
+                  </button>
                 </div>
               </div>
 
-              {viewMode === 'edit' ? (
-                <div className="grid grid-cols-2 divide-x divide-slate-200 min-h-full">
-                  <div className="flex p-2 bg-slate-50/30">
-                    <div className="select-none pr-3 text-right text-slate-300 font-mono text-[11px] leading-[22px] min-w-[34px] border-r border-slate-100 mr-2">
-                      {rawLines.map((_, i) => (
-                        <div key={i} className="leading-[22px]">{i + 1}</div>
-                      ))}
-                    </div>
-                    <textarea
-                      value={rawText}
-                      onChange={(e) => onChangeRawText(e.target.value)}
-                      placeholder="Paste text, log entries, or drag files here..."
-                      className="flex-1 bg-transparent border-0 p-0 text-slate-900 font-mono text-xs leading-[22px] whitespace-pre-wrap break-words resize-none focus:outline-hidden"
-                      spellCheck={false}
-                    />
-                  </div>
-                  <div className="p-2 bg-white">
-                    {Array.from({ length: totalLines }).map((_, idx) => {
-                      const lineNo = idx + 1;
-                      const textLine = sanitizedLines[idx] ?? '';
-                      return (
-                        <div key={`edit_san_${lineNo}`} className="flex items-start leading-[22px]">
-                          <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
-                            {lineNo}
-                          </span>
-                          <div className="flex-1 min-w-0 font-mono text-xs text-slate-800 whitespace-pre-wrap break-words break-all">
-                            {renderSanitizedLine(textLine, lineNo)}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-700 px-1">
+                  <span>Type or Paste Text Below:</span>
+                  <button
+                    onClick={onPasteClipboard}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                  >
+                    <ClipboardPaste className="w-3.5 h-3.5" />
+                    <span>Paste from Clipboard</span>
+                  </button>
                 </div>
-              ) : (
-                <div>
-                  {Array.from({ length: totalLines }).map((_, idx) => {
-                    const lineNo = idx + 1;
-                    const rawLineText = rawLines[idx] ?? '';
-                    const sanLineText = sanitizedLines[idx] ?? '';
-                    return (
-                      <div
-                        key={`diff_row_${lineNo}`}
-                        id={`diff_row_${lineNo}`}
-                        className="grid grid-cols-2 divide-x divide-slate-200 hover:bg-slate-50/60 transition-colors"
-                      >
-                        <div className="flex items-start min-w-0 px-2 py-1 leading-[22px] bg-slate-50/20">
-                          <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
-                            {lineNo}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            {renderInspectLine(rawLineText, lineNo)}
-                          </div>
-                        </div>
+                <textarea
+                  value={rawText}
+                  onChange={(e) => onChangeRawText(e.target.value)}
+                  placeholder="Paste sensitive logs, resumes, support tickets, or clinical notes directly here to begin instant zero-leakage redaction..."
+                  className="w-full h-32 p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:bg-white resize-none"
+                  spellCheck={false}
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-b border-slate-200 bg-slate-50/90 text-xs">
+              <div className="flex items-center justify-between px-3.5 py-2 gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                  <span className="font-bold text-slate-800 truncate" title={activeFile?.name || 'Raw Document Stream'}>
+                    {activeFile?.name || 'Raw Document Stream'}
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold uppercase bg-slate-200 text-slate-700 flex-shrink-0">
+                    {activeFormat === 'text' ? 'txt' : activeFormat}
+                  </span>
+                </div>
 
-                        <div className="flex items-start min-w-0 px-2 py-1 leading-[22px] bg-white">
-                          <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
-                            {lineNo}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            {renderSanitizedLine(sanLineText, lineNo)}
-                          </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="flex bg-slate-200/80 p-0.5 rounded-lg border border-slate-300/60">
+                    <button
+                      onClick={() => setViewMode('edit')}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded-md transition-all cursor-pointer whitespace-nowrap ${
+                        viewMode === 'edit'
+                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                      title="Direct edit raw text"
+                    >
+                      <Edit3 className="w-3 h-3 text-indigo-600" />
+                      <span>Type / Edit</span>
+                    </button>
+                    <button
+                      onClick={() => setViewMode('inspect')}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded-md transition-all cursor-pointer whitespace-nowrap ${
+                        viewMode === 'inspect'
+                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                      title="View validated PII entity highlights"
+                    >
+                      <Eye className="w-3 h-3 text-indigo-600" />
+                      <span>X-Ray Highlights</span>
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={onPasteClipboard}
+                    className="p-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                    title="Paste from clipboard"
+                  >
+                    <ClipboardPaste className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    onClick={onTriggerUpload}
+                    className="p-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                    title="Upload new file"
+                  >
+                    <UploadCloud className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    onClick={onClearInput}
+                    className="p-1 rounded-md text-rose-600 hover:text-rose-800 hover:bg-rose-50 transition-colors cursor-pointer"
+                    title="Clear input"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between px-3.5 py-2 gap-2 min-w-0 bg-slate-50/50">
+                <div className="flex items-center gap-1.5 text-emerald-800 font-bold min-w-0">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <span className="truncate">Sanitized Zero-Leakage Stream</span>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {isTabular && (
+                    <button
+                      onClick={() => setShowTablePreview(!showTablePreview)}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded-md border text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                        showTablePreview
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Table2 className="w-3 h-3" />
+                      <span>Table Grid</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={onCopySanitized}
+                    className="flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-md shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    {isCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-700">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Copy Clean Text</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {showTablePreview && matrixData ? (
+              <div className="p-3 bg-slate-50/50 min-h-[480px]">
+                <TablePreview matrix={matrixData} />
+              </div>
+            ) : (
+              <div className="flex h-[560px] overflow-hidden">
+                <div 
+                  ref={unifiedScrollRef}
+                  className="flex-1 overflow-y-auto divide-y divide-slate-100"
+                >
+                  <div className="sticky top-0 z-10 grid grid-cols-2 divide-x divide-slate-200 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 shadow-2xs">
+                    <div className="px-3.5 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <span>Original Untrusted Stream</span>
+                      <span>{rawLines.length} lines</span>
+                    </div>
+                    <div className="px-3.5 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100/95">
+                      <span className="text-emerald-700 flex items-center gap-1">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        Sanitized Output Stream
+                      </span>
+                      <span>{sanitizedLines.length} lines</span>
+                    </div>
+                  </div>
+
+                  {viewMode === 'edit' ? (
+                    <div className="grid grid-cols-2 divide-x divide-slate-200 min-h-full">
+                      <div className="flex p-2 bg-slate-50/30">
+                        <div className="select-none pr-3 text-right text-slate-300 font-mono text-[11px] leading-[22px] min-w-[34px] border-r border-slate-100 mr-2">
+                          {rawLines.map((_, i) => (
+                            <div key={i} className="leading-[22px]">{i + 1}</div>
+                          ))}
                         </div>
+                        <textarea
+                          value={rawText}
+                          onChange={(e) => onChangeRawText(e.target.value)}
+                          placeholder="Type or edit text live here..."
+                          className="flex-1 bg-transparent border-0 p-0 text-slate-900 font-mono text-xs leading-[22px] whitespace-pre-wrap break-words [overflow-wrap:anywhere] resize-none focus:outline-hidden"
+                          spellCheck={false}
+                        />
                       </div>
+                      <div className="p-2 bg-white">
+                        {Array.from({ length: totalLines }).map((_, idx) => {
+                          const lineNo = idx + 1;
+                          const textLine = sanitizedLines[idx] ?? '';
+                          return (
+                            <div key={`edit_san_${lineNo}`} className="flex items-start leading-[22px]">
+                              <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
+                                {lineNo}
+                              </span>
+                              <div className="flex-1 min-w-0 font-mono text-xs text-slate-800 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                                {renderSanitizedLine(textLine, lineNo)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      {Array.from({ length: totalLines }).map((_, idx) => {
+                        const lineNo = idx + 1;
+                        const rawLineText = rawLines[idx] ?? '';
+                        const sanLineText = sanitizedLines[idx] ?? '';
+                        return (
+                          <div
+                            key={`diff_row_${lineNo}`}
+                            id={`diff_row_${lineNo}`}
+                            className="grid grid-cols-2 divide-x divide-slate-200 hover:bg-slate-50/60 transition-colors"
+                          >
+                            <div 
+                              onClick={() => setViewMode('edit')}
+                              className="flex items-start min-w-0 px-2 py-1 leading-[22px] bg-slate-50/20 cursor-text group"
+                              title="Click to live-edit raw text"
+                            >
+                              <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
+                                {lineNo}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                {renderInspectLine(rawLineText, lineNo)}
+                              </div>
+                            </div>
+
+                            <div className="flex items-start min-w-0 px-2 py-1 leading-[22px] bg-white">
+                              <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
+                                {lineNo}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                {renderSanitizedLine(sanLineText, lineNo)}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div 
+                  className="w-7 border-l border-slate-200 bg-[#F8FAFC] relative flex-shrink-0 select-none hidden md:block"
+                  title="PII Radar Scroll Minimap — click any marker to jump to line"
+                >
+                  <div className="absolute top-1 left-0 right-0 text-[8px] font-bold text-center text-slate-400 uppercase tracking-tighter pointer-events-none">
+                    Radar
+                  </div>
+                  {activeMatches.map((m) => {
+                    const fraction = Math.min(0.96, Math.max(0.04, (m.line - 1) / Math.max(totalLines, 1)));
+                    const topPercent = (fraction * 100).toFixed(1);
+                    return (
+                      <button
+                        key={`radar_${m.id}`}
+                        onClick={() => scrollToLine(m.line)}
+                        style={{ top: `${topPercent}%` }}
+                        className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 flex items-center justify-center hover:scale-150 transition-transform cursor-pointer"
+                        title={`Line ${m.line}: ${m.type} ("${m.value}")`}
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full shadow-2xs"
+                          style={{ backgroundColor: getDotColor(m.type) }}
+                        />
+                      </button>
                     );
                   })}
                 </div>
-              )}
-            </div>
-
-            <div 
-              className="w-7 border-l border-slate-200 bg-[#F8FAFC] relative flex-shrink-0 select-none hidden md:block"
-              title="PII Radar Scroll Minimap — click any marker to jump to line"
-            >
-              <div className="absolute top-1 left-0 right-0 text-[8px] font-bold text-center text-slate-400 uppercase tracking-tighter pointer-events-none">
-                Radar
               </div>
-              {activeMatches.map((m) => {
-                const fraction = Math.min(0.96, Math.max(0.04, (m.line - 1) / Math.max(totalLines, 1)));
-                const topPercent = (fraction * 100).toFixed(1);
-                return (
-                  <button
-                    key={`radar_${m.id}`}
-                    onClick={() => scrollToLine(m.line)}
-                    style={{ top: `${topPercent}%` }}
-                    className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 flex items-center justify-center hover:scale-150 transition-transform cursor-pointer"
-                    title={`Line ${m.line}: ${m.type} ("${m.value}")`}
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full shadow-2xs"
-                      style={{ backgroundColor: getDotColor(m.type) }}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+            )}
+          </>
         )}
       </div>
 

@@ -61,6 +61,8 @@ export default function App() {
   const [isCopied, setIsCopied] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [liveRawHash, setLiveRawHash] = useState<string>('');
+  const [liveSanitizedHash, setLiveSanitizedHash] = useState<string>('');
 
   const sharedPseudonymMapRef = useRef<Record<string, string>>({});
   const sharedCountersRef = useRef<Record<string, number>>({});
@@ -150,6 +152,48 @@ export default function App() {
     }, 150);
     return () => clearTimeout(processTimeoutRef.current);
   }, [rawText, runSanitization]);
+
+  useEffect(() => {
+    let active = true;
+    async function digestHashes() {
+      if (!rawText) {
+        if (active) {
+          setLiveRawHash('');
+          setLiveSanitizedHash('');
+        }
+        return;
+      }
+      const cleanText = sanitizedResult?.sanitized_text || rawText;
+      if (window.crypto && window.crypto.subtle) {
+        try {
+          const [rb, sb] = await Promise.all([
+            window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawText)),
+            window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(cleanText))
+          ]);
+          if (active) {
+            setLiveRawHash(Array.from(new Uint8Array(rb)).map(b => b.toString(16).padStart(2, '0')).join(''));
+            setLiveSanitizedHash(Array.from(new Uint8Array(sb)).map(b => b.toString(16).padStart(2, '0')).join(''));
+          }
+          return;
+        } catch (e) {}
+      }
+      if (active && sanitizedResult?.raw_sha256) {
+        setLiveRawHash(sanitizedResult.raw_sha256);
+        setLiveSanitizedHash(sanitizedResult.sanitized_sha256);
+      }
+    }
+    digestHashes();
+    return () => { active = false; };
+  }, [rawText, sanitizedResult?.sanitized_text, sanitizedResult?.raw_sha256, sanitizedResult?.sanitized_sha256]);
+
+  const handleClearInput = () => {
+    setRawText('');
+    setSanitizedResult(null);
+    setBatchFiles([]);
+    setWhitelistedIds(new Set());
+    setSelectedCategory(null);
+    addToast('Cleared document input');
+  };
 
   const handleLoadSample = async (sampleType: string) => {
     try {
@@ -593,6 +637,12 @@ export default function App() {
               onCopySanitized={handleCopySanitized}
               isCopied={isCopied}
               tableMatrix={activeFile?.tableMatrix}
+              onPasteClipboard={handlePasteClipboard}
+              onTriggerUpload={() => fileInputRef.current?.click()}
+              onClearInput={handleClearInput}
+              onLoadSample={handleLoadSample}
+              onDropFiles={handleProcessIncomingFiles}
+              isDragging={isDragging}
             />
 
             <ExportBar
@@ -601,8 +651,8 @@ export default function App() {
               onDownloadVault={handleDownloadVault}
               redactionMode={redactionMode}
               activeFormat={activeFormat}
-              rawHash={sanitizedResult?.raw_sha256}
-              sanitizedHash={sanitizedResult?.sanitized_sha256}
+              rawHash={liveRawHash || sanitizedResult?.raw_sha256}
+              sanitizedHash={liveSanitizedHash || sanitizedResult?.sanitized_sha256}
               activeMatchesCount={sanitizedResult?.active_matches_count || 0}
             />
           </>

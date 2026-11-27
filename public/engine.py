@@ -968,10 +968,7 @@ def generate_sample(sample_type):
         return "\n".join(lines)
 
     else:
-        doc = f"""================================================================================
-CYBER DEFENSE OPERATIONS CENTER — INCIDENT DOSSIER #SEC-2026-7749
-Classification: CONFIDENTIAL // STRICT PRIVACY COMPLIANCE MANDATE
-================================================================================
+        doc = f"""CYBER DEFENSE INCIDENT DOSSIER #SEC-2026-7749 [STRICT CONFIDENTIAL]
 
 SECTION 1: ESCALATION SUMMARY & ON-CALL REPORT
 Date: 2026-11-27T08:30:00Z

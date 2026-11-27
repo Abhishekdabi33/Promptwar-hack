@@ -593,11 +593,27 @@ self.onmessage = async (e) => {
         return;
       } catch (err) {
         const fbResult = fallbackProcessText(content, options, pseudonymMap, counters);
+        if (self.crypto && self.crypto.subtle) {
+          const [rb, sb] = await Promise.all([
+            self.crypto.subtle.digest('SHA-256', new TextEncoder().encode(content || '')),
+            self.crypto.subtle.digest('SHA-256', new TextEncoder().encode(fbResult.sanitized_text || ''))
+          ]);
+          fbResult.raw_sha256 = Array.from(new Uint8Array(rb)).map(b => b.toString(16).padStart(2, '0')).join('');
+          fbResult.sanitized_sha256 = Array.from(new Uint8Array(sb)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
         postMessage({ id, type: 'PROCESS_SUCCESS', result: fbResult, engine: 'fallback' });
         return;
       }
     } else {
       const fbResult = fallbackProcessText(content, options, pseudonymMap, counters);
+      if (self.crypto && self.crypto.subtle) {
+        const [rb, sb] = await Promise.all([
+          self.crypto.subtle.digest('SHA-256', new TextEncoder().encode(content || '')),
+          self.crypto.subtle.digest('SHA-256', new TextEncoder().encode(fbResult.sanitized_text || ''))
+        ]);
+        fbResult.raw_sha256 = Array.from(new Uint8Array(rb)).map(b => b.toString(16).padStart(2, '0')).join('');
+        fbResult.sanitized_sha256 = Array.from(new Uint8Array(sb)).map(b => b.toString(16).padStart(2, '0')).join('');
+      }
       postMessage({ id, type: 'PROCESS_SUCCESS', result: fbResult, engine: 'fallback' });
       return;
     }
@@ -697,10 +713,7 @@ self.onmessage = async (e) => {
       ].join('\n');
       postMessage({ id, type: 'SAMPLE_SUCCESS', result: csvStr });
     } else {
-      const doc = `================================================================================
-CYBER DEFENSE OPERATIONS CENTER — INCIDENT DOSSIER #SEC-2026-7749
-Classification: CONFIDENTIAL // STRICT PRIVACY COMPLIANCE MANDATE
-================================================================================
+      const doc = `CYBER DEFENSE INCIDENT DOSSIER #SEC-2026-7749 [STRICT CONFIDENTIAL]
 
 SECTION 1: ESCALATION SUMMARY & ON-CALL REPORT
 Date: 2026-11-27T08:30:00Z
