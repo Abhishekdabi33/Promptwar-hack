@@ -105,3 +105,21 @@ export interface ToastItem {
 }
 
 export type TabType = 'studio' | 'promptlog';
+
+export interface ActivityHistoryItem {
+  id: string;
+  timestamp: string;
+  mode: 'sanitizer' | 'message_guard';
+  title: string;
+  rawPreview: string;
+  sanitizedPreview: string;
+  rawText: string;
+  sanitizedText: string;
+  risksCount: number;
+  riskTier: SeverityTier;
+  redactionMode: RedactionMode;
+  rawHash?: string;
+  sanitizedHash?: string;
+  fileName?: string;
+  format?: string;
+}

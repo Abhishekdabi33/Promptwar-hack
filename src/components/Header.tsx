@@ -3,7 +3,10 @@ import {
   Shield, 
   Plus, 
   TerminalSquare,
-  SlidersHorizontal
+  SlidersHorizontal,
+  History,
+  Puzzle,
+  Download
 } from 'lucide-react';
 import { TabType, WorkerStatus } from '../types';
 
@@ -13,6 +16,11 @@ interface HeaderProps {
   workerStatus: WorkerStatus;
   onOpenInputHub: () => void;
   onOpenDrawer: () => void;
+  onOpenHistory: () => void;
+  onOpenExtensionModal: () => void;
+  historyCount?: number;
+  onInstallPwa?: () => void;
+  canInstall?: boolean;
 }
 
 export default function Header({
@@ -20,7 +28,12 @@ export default function Header({
   setActiveTab,
   workerStatus,
   onOpenInputHub,
-  onOpenDrawer
+  onOpenDrawer,
+  onOpenHistory,
+  onOpenExtensionModal,
+  historyCount = 0,
+  onInstallPwa,
+  canInstall = false
 }: HeaderProps) {
   const isReady = workerStatus.status === 'ready' || workerStatus.status === 'ready_fallback';
 
@@ -38,7 +51,7 @@ export default function Header({
           </div>
         </div>
 
-        <div className="hidden md:flex items-center flex-shrink-0">
+        <div className="hidden lg:flex items-center flex-shrink-0">
           <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium">
             <span className="relative flex h-2 w-2">
               <span className={`inline-flex rounded-full h-2 w-2 ${isReady ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}></span>
@@ -53,7 +66,41 @@ export default function Header({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>New Input</span>
+            <span className="hidden sm:inline">New Input</span>
+          </button>
+
+          {canInstall && (
+            <button
+              onClick={onInstallPwa}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+              title="Install PII Shield as an offline PWA app"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Install App</span>
+            </button>
+          )}
+
+          <button
+            onClick={onOpenHistory}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+            title="View local activity history"
+          >
+            <History className="w-3.5 h-3.5 text-slate-500" />
+            <span className="hidden sm:inline">History</span>
+            {historyCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 text-[10px] font-mono font-medium">
+                {historyCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={onOpenExtensionModal}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer whitespace-nowrap hidden md:inline-flex"
+            title="Download Chrome Extension"
+          >
+            <Puzzle className="w-3.5 h-3.5 text-slate-500" />
+            <span>Extension</span>
           </button>
 
           <button

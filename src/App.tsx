@@ -7,7 +7,16 @@ import InputHubModal from './components/InputHubModal';
 import DetectorDrawer from './components/DetectorDrawer';
 import PromptLogTab from './components/PromptLogTab';
 import MessageGuardView from './components/MessageGuardView';
+import HistoryDrawer from './components/HistoryDrawer';
+import ExtensionModal from './components/ExtensionModal';
 import Toast from './components/Toast';
+import { 
+  loadActivityHistory, 
+  saveActivityItem, 
+  deleteActivityItem, 
+  clearActivityHistory, 
+  exportHistoryAsJson 
+} from './utils/historyStorage';
 import { 
   initPyodideWorker, 
   subscribeWorkerStatus, 
@@ -44,7 +53,8 @@ import {
   SanitizationResult, 
   ToastItem, 
   EntityCategory,
-  AppMode 
+  AppMode,
+  ActivityHistoryItem 
 } from './types';
 
 export default function App() {
@@ -96,6 +106,118 @@ export default function App() {
 
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
+  const [historyItems, setHistoryItems] = useState<ActivityHistoryItem[]>(() => loadActivityHistory());
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const lastSavedHashRef = useRef<string>('');
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    if (choice?.outcome === 'accepted') {
+      addToast('PII Shield app installed successfully');
+    }
+    setInstallPrompt(null);
+  };
+
+  const normalizeTier = (tier?: string): 'Low' | 'Medium' | 'High' | 'Critical' => {
+    if (!tier) return 'Low';
+    const lower = tier.toLowerCase();
+    if (lower === 'critical') return 'Critical';
+    if (lower === 'high') return 'High';
+    if (lower === 'medium') return 'Medium';
+    return 'Low';
+  };
+
+  const recordSessionInHistory = useCallback((
+    mode: AppMode,
+    title: string,
+    format: string,
+    raw: string,
+    clean: string,
+    res: SanitizationResult | null,
+    rawHashVal?: string,
+    sanHashVal?: string
+  ) => {
+    if (!raw || !raw.trim()) return;
+    const rHash = rawHashVal || res?.raw_sha256 || '';
+    const sHash = sanHashVal || res?.sanitized_sha256 || '';
+    const uniqueKey = `${mode}_${rHash}_${sHash}`;
+    if (lastSavedHashRef.current === uniqueKey) return;
+    lastSavedHashRef.current = uniqueKey;
+
+    const item: ActivityHistoryItem = {
+      id: `hist_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      title: title || (mode === 'message_guard' ? 'Guarded Message' : 'Sanitized Document'),
+      mode,
+      format: format || 'txt',
+      rawPreview: raw.length > 200 ? raw.slice(0, 200) + '...' : raw,
+      sanitizedPreview: clean.length > 200 ? clean.slice(0, 200) + '...' : clean,
+      rawText: raw,
+      sanitizedText: clean,
+      risksCount: res?.active_matches_count ?? 0,
+      riskTier: normalizeTier(res?.risk_tier),
+      redactionMode: redactionMode,
+      rawHash: rHash,
+      sanitizedHash: sHash,
+      fileName: title
+    };
+    saveActivityItem(item);
+    setHistoryItems(loadActivityHistory());
+  }, [redactionMode]);
+
+  const handleRestoreHistory = (item: ActivityHistoryItem) => {
+    if (item.mode === 'message_guard') {
+      setAppMode('message_guard');
+      setMessageGuardText(item.rawText);
+    } else {
+      setAppMode('sanitizer');
+      const text = item.rawText;
+      setRawText(text);
+      const restoredFile: BatchFile = {
+        id: `restored_${Date.now()}`,
+        name: item.title,
+        size: text.length,
+        format: item.format || 'txt',
+        rawText: text
+      };
+      setBatchFiles([restoredFile]);
+      setActiveBatchIndex(0);
+      setWhitelistedIds(new Set());
+      setSelectedCategory(null);
+      setCurrentEntityIndex(0);
+    }
+    if (item.redactionMode) {
+      setRedactionMode(item.redactionMode);
+    }
+    setIsHistoryOpen(false);
+    addToast(`Restored: ${item.title}`);
+  };
+
+  const handleDeleteHistory = (id: string) => {
+    deleteActivityItem(id);
+    setHistoryItems(loadActivityHistory());
+    addToast('Removed history entry');
+  };
+
+  const handleClearHistory = () => {
+    clearActivityHistory();
+    setHistoryItems([]);
+    addToast('Cleared all local activity history');
   };
 
   useEffect(() => {
@@ -213,6 +335,40 @@ export default function App() {
     digestHashes();
     return () => { active = false; };
   }, [rawText, sanitizedResult?.sanitized_text, sanitizedResult?.raw_sha256, sanitizedResult?.sanitized_sha256]);
+
+  useEffect(() => {
+    if (appMode === 'sanitizer' && sanitizedResult && rawText.trim().length > 0) {
+      const timer = setTimeout(() => {
+        recordSessionInHistory(
+          'sanitizer',
+          activeFile?.name || 'Document Snippet',
+          activeFormat,
+          rawText,
+          sanitizedResult.sanitized_text || rawText,
+          sanitizedResult,
+          liveRawHash,
+          liveSanitizedHash
+        );
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [sanitizedResult, rawText, activeFile?.name, activeFormat, appMode, liveRawHash, liveSanitizedHash, recordSessionInHistory]);
+
+  useEffect(() => {
+    if (appMode === 'message_guard' && messageGuardResult && messageGuardText.trim().length > 0) {
+      const timer = setTimeout(() => {
+        recordSessionInHistory(
+          'message_guard',
+          'Guarded Message',
+          'txt',
+          messageGuardText,
+          messageGuardResult.sanitized_text || messageGuardText,
+          messageGuardResult
+        );
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [messageGuardResult, messageGuardText, appMode, recordSessionInHistory]);
 
   const handleClearInput = () => {
     setRawText('');
@@ -414,6 +570,16 @@ export default function App() {
     navigator.clipboard.writeText(textToCopy);
     setIsCopied(true);
     addToast('Sanitized clean text copied to clipboard');
+    recordSessionInHistory(
+      'sanitizer',
+      activeFile?.name || 'Document Snippet',
+      activeFormat,
+      rawText,
+      textToCopy,
+      sanitizedResult,
+      liveRawHash,
+      liveSanitizedHash
+    );
     setTimeout(() => setIsCopied(false), 2000);
   };
 
@@ -423,6 +589,17 @@ export default function App() {
     const ext = cleanExt === 'text' ? 'txt' : (cleanExt || 'txt');
     const baseName = activeFile?.name ? activeFile.name.replace(/\.[^/.]+$/, "") : "document";
     const filename = `sanitized_${baseName}.${ext}`;
+
+    recordSessionInHistory(
+      'sanitizer',
+      activeFile?.name || 'Document Snippet',
+      activeFormat,
+      rawText,
+      textToDownload,
+      sanitizedResult,
+      liveRawHash,
+      liveSanitizedHash
+    );
 
     if (activeFormat === 'docx' && activeFile?.sanitizedBlob) {
       downloadBlob(activeFile.sanitizedBlob, filename);
@@ -544,6 +721,11 @@ export default function App() {
         workerStatus={workerStatus}
         onOpenInputHub={() => setIsInputHubOpen(true)}
         onOpenDrawer={() => setIsDrawerOpen(true)}
+        onOpenHistory={() => setIsHistoryOpen(true)}
+        onOpenExtensionModal={() => setIsExtensionModalOpen(true)}
+        historyCount={historyItems.length}
+        canInstall={Boolean(installPrompt)}
+        onInstallPwa={handleInstallPwa}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -861,6 +1043,22 @@ export default function App() {
         customRules={customRules}
         onAddCustomRule={handleAddCustomRule}
         onRemoveCustomRule={handleRemoveCustomRule}
+      />
+
+      <HistoryDrawer
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        history={historyItems}
+        onRestore={handleRestoreHistory}
+        onDelete={handleDeleteHistory}
+        onClearAll={handleClearHistory}
+        addToast={addToast}
+      />
+
+      <ExtensionModal
+        isOpen={isExtensionModalOpen}
+        onClose={() => setIsExtensionModalOpen(false)}
+        onToast={addToast}
       />
 
       <Toast toasts={toasts} onDismiss={removeToast} />

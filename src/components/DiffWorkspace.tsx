@@ -61,6 +61,7 @@ export default function DiffWorkspace({
   onClearInput
 }: DiffWorkspaceProps) {
   const [viewMode, setViewMode] = useState<'edit' | 'inspect'>('inspect');
+  const [mobilePane, setMobilePane] = useState<'both' | 'raw' | 'sanitized'>('sanitized');
   const [showTablePreview, setShowTablePreview] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<PIIMatch | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -538,17 +539,53 @@ export default function DiffWorkspace({
                 <TablePreview matrix={matrixData} />
               </div>
             ) : (
-              <div className="flex h-[560px] overflow-hidden">
+              <div className="flex flex-col h-[560px] overflow-hidden">
+                <div className="flex md:hidden items-center justify-between px-3 py-1.5 bg-slate-100 border-b border-slate-200 flex-shrink-0">
+                  <span className="text-[11px] font-semibold text-slate-600">Mobile View:</span>
+                  <div className="inline-flex bg-slate-200/80 p-0.5 rounded-lg text-xs">
+                    <button
+                      onClick={() => setMobilePane('raw')}
+                      className={`px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                        mobilePane === 'raw' ? 'bg-white text-slate-900 shadow-2xs font-semibold' : 'text-slate-600'
+                      }`}
+                    >
+                      Original
+                    </button>
+                    <button
+                      onClick={() => setMobilePane('sanitized')}
+                      className={`px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                        mobilePane === 'sanitized' ? 'bg-white text-slate-900 shadow-2xs font-semibold' : 'text-slate-600'
+                      }`}
+                    >
+                      Sanitized
+                    </button>
+                    <button
+                      onClick={() => setMobilePane('both')}
+                      className={`px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                        mobilePane === 'both' ? 'bg-white text-slate-900 shadow-2xs font-semibold' : 'text-slate-600'
+                      }`}
+                    >
+                      Split
+                    </button>
+                  </div>
+                </div>
+
                 <div 
                   ref={unifiedScrollRef}
-                  className="flex-1 overflow-y-auto divide-y divide-slate-100"
+                  className="flex-1 overflow-y-auto divide-y divide-slate-100 flex flex-col"
                 >
-                  <div className="sticky top-0 z-10 grid grid-cols-2 divide-x divide-slate-200 bg-slate-100 border-b border-slate-200 shadow-2xs">
-                    <div className="px-4 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <div className={`sticky top-0 z-10 grid ${
+                    mobilePane === 'both' ? 'grid-cols-2 divide-x' : 'grid-cols-1 md:grid-cols-2 md:divide-x'
+                  } divide-slate-200 bg-slate-100 border-b border-slate-200 shadow-2xs`}>
+                    <div className={`px-4 py-1.5 items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider ${
+                      mobilePane === 'sanitized' ? 'hidden md:flex' : 'flex'
+                    }`}>
                       <span>Original Input</span>
                       <span>{rawLines.length} lines</span>
                     </div>
-                    <div className="px-4 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100">
+                    <div className={`px-4 py-1.5 items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 ${
+                      mobilePane === 'raw' ? 'hidden md:flex' : 'flex'
+                    }`}>
                       <span className="text-slate-800 flex items-center gap-1">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                         Sanitized Output
@@ -558,8 +595,10 @@ export default function DiffWorkspace({
                   </div>
 
                   {viewMode === 'edit' ? (
-                    <div className="grid grid-cols-2 divide-x divide-slate-200/80 min-h-full">
-                      <div className="flex p-3 bg-slate-50/30">
+                    <div className={`grid ${
+                      mobilePane === 'both' ? 'grid-cols-2 divide-x' : 'grid-cols-1 md:grid-cols-2 md:divide-x'
+                    } divide-slate-200/80 min-h-full flex-1`}>
+                      <div className={`p-3 bg-slate-50/30 ${mobilePane === 'sanitized' ? 'hidden md:flex' : 'flex'}`}>
                         <div className="select-none pr-3 text-right text-slate-300 font-mono text-[11px] leading-[22px] min-w-[34px] border-r border-slate-100 mr-2">
                           {rawLines.map((_, i) => (
                             <div key={i} className="leading-[22px]">{i + 1}</div>
@@ -573,7 +612,7 @@ export default function DiffWorkspace({
                           spellCheck={false}
                         />
                       </div>
-                      <div className="p-3 bg-white">
+                      <div className={`p-3 bg-white ${mobilePane === 'raw' ? 'hidden md:block' : 'block'}`}>
                         {Array.from({ length: totalLines }).map((_, idx) => {
                           const lineNo = idx + 1;
                           const textLine = sanitizedLines[idx] ?? '';
@@ -600,11 +639,15 @@ export default function DiffWorkspace({
                           <div
                             key={`diff_row_${lineNo}`}
                             id={`diff_row_${lineNo}`}
-                            className="grid grid-cols-2 divide-x divide-slate-200/80 hover:bg-slate-50/60 transition-colors"
+                            className={`grid ${
+                              mobilePane === 'both' ? 'grid-cols-2 divide-x' : 'grid-cols-1 md:grid-cols-2 md:divide-x'
+                            } divide-slate-200/80 hover:bg-slate-50/60 transition-colors`}
                           >
                             <div 
                               onClick={() => setViewMode('edit')}
-                              className="flex items-start min-w-0 px-3 py-1 leading-[22px] bg-slate-50/20 cursor-text"
+                              className={`items-start min-w-0 px-3 py-1 leading-[22px] bg-slate-50/20 cursor-text ${
+                                mobilePane === 'sanitized' ? 'hidden md:flex' : 'flex'
+                              }`}
                               title="Click to live-edit raw text"
                             >
                               <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
@@ -615,7 +658,9 @@ export default function DiffWorkspace({
                               </div>
                             </div>
 
-                            <div className="flex items-start min-w-0 px-3 py-1 leading-[22px] bg-white">
+                            <div className={`items-start min-w-0 px-3 py-1 leading-[22px] bg-white ${
+                              mobilePane === 'raw' ? 'hidden md:flex' : 'flex'
+                            }`}>
                               <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
                                 {lineNo}
                               </span>

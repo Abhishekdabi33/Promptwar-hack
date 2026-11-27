@@ -22,6 +22,7 @@ interface CommandStripProps {
   onSelectCategory: (cat: EntityCategory | null) => void;
   onOpenDrawer: () => void;
   activeDetectorCount: number;
+  totalDetectors?: number;
   currentEntityIndex?: number;
 }
 
@@ -31,6 +32,7 @@ export default function CommandStrip({
   onSelectCategory,
   onOpenDrawer,
   activeDetectorCount,
+  totalDetectors,
   currentEntityIndex = 0
 }: CommandStripProps) {
   const [trapModalOpen, setTrapModalOpen] = useState(false);
@@ -208,12 +210,12 @@ export default function CommandStrip({
         <div className="flex items-center gap-2 flex-shrink-0 justify-end">
           <button
             onClick={onOpenDrawer}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-white/90 hover:bg-white border border-slate-200 shadow-2xs transition-all cursor-pointer whitespace-nowrap hover:border-indigo-300"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
           >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Detectors & Rules</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold">
-              {activeDetectorCount}/8
+            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+            <span>Settings & Rules</span>
+            <span className="px-1.5 py-0.2 rounded-md bg-slate-100 border border-slate-200 text-slate-700 text-[10px] font-mono font-medium">
+              {activeDetectorCount}/{totalDetectors ?? categories.length}
             </span>
           </button>
         </div>

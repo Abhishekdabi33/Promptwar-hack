@@ -43,8 +43,8 @@ export default function ExportBar({
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-xs px-4 py-3 mb-6">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline whitespace-nowrap">
             FINGERPRINTS:
           </span>
@@ -52,7 +52,7 @@ export default function ExportBar({
             <Fingerprint className="w-3.5 h-3.5 text-slate-400" />
             <span className="font-sans font-medium text-slate-500">Raw SHA-256:</span>
             <span className="font-semibold text-slate-800">
-              {rawHash ? `${rawHash.slice(0, 8)}...${rawHash.slice(-6)}` : 'Computing...'}
+              {rawHash ? `${rawHash.slice(0, 7)}...${rawHash.slice(-5)}` : 'Computing...'}
             </span>
             {rawHash && (
               <button
@@ -69,7 +69,7 @@ export default function ExportBar({
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
             <span className="font-sans font-medium text-emerald-700">Clean SHA-256:</span>
             <span className="font-semibold text-emerald-950">
-              {sanitizedHash ? `${sanitizedHash.slice(0, 8)}...${sanitizedHash.slice(-6)}` : 'Computing...'}
+              {sanitizedHash ? `${sanitizedHash.slice(0, 7)}...${sanitizedHash.slice(-5)}` : 'Computing...'}
             </span>
             {sanitizedHash && (
               <button
@@ -83,11 +83,11 @@ export default function ExportBar({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-2 flex-wrap justify-start xl:justify-end">
           {redactionMode === 'pseudonym' && (
             <button
               onClick={onDownloadVault}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap hover:text-slate-900"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 hover:text-slate-900"
             >
               <Key className="w-3.5 h-3.5 text-slate-500" />
               <span>Pseudonym Key (.json)</span>
@@ -96,7 +96,7 @@ export default function ExportBar({
 
           <button
             onClick={onDownloadAuditReport}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap hover:text-slate-900"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 hover:text-slate-900"
           >
             <FileCheck2 className="w-3.5 h-3.5 text-slate-500" />
             <span>Audit Report (.json)</span>
@@ -104,7 +104,7 @@ export default function ExportBar({
 
           <button
             onClick={onDownloadSanitized}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs transition-all cursor-pointer whitespace-nowrap active:scale-95"
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs transition-all cursor-pointer whitespace-nowrap flex-shrink-0 active:scale-95"
           >
             <Download className="w-3.5 h-3.5 text-white" />
             <span>Download Sanitized (.{displayExt})</span>
