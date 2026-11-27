@@ -61,19 +61,27 @@ export default function DiffWorkspace({
     return matches.filter(m => !whitelistedIds.has(m.id));
   }, [matches, whitelistedIds]);
 
+  const matchesByLine = useMemo(() => {
+    const map = new Map<number, PIIMatch[]>();
+    for (const m of matches) {
+      if (!map.has(m.line)) map.set(m.line, []);
+      map.get(m.line)!.push(m);
+    }
+    return map;
+  }, [matches]);
+
   const handleLeftScroll = () => {
     if (isScrollingRef.current === 'right') return;
     isScrollingRef.current = 'left';
 
     if (leftPaneRef.current && rightPaneRef.current) {
-      const scrollFraction = leftPaneRef.current.scrollTop / (leftPaneRef.current.scrollHeight - leftPaneRef.current.clientHeight || 1);
-      rightPaneRef.current.scrollTop = scrollFraction * (rightPaneRef.current.scrollHeight - rightPaneRef.current.clientHeight);
+      rightPaneRef.current.scrollTop = leftPaneRef.current.scrollTop;
     }
 
     clearTimeout(scrollTimeoutRef.current);
     scrollTimeoutRef.current = setTimeout(() => {
       isScrollingRef.current = null;
-    }, 50);
+    }, 60);
   };
 
   const handleRightScroll = () => {
@@ -81,26 +89,25 @@ export default function DiffWorkspace({
     isScrollingRef.current = 'right';
 
     if (leftPaneRef.current && rightPaneRef.current) {
-      const scrollFraction = rightPaneRef.current.scrollTop / (rightPaneRef.current.scrollHeight - rightPaneRef.current.clientHeight || 1);
-      leftPaneRef.current.scrollTop = scrollFraction * (leftPaneRef.current.scrollHeight - leftPaneRef.current.clientHeight);
+      leftPaneRef.current.scrollTop = rightPaneRef.current.scrollTop;
     }
 
     clearTimeout(scrollTimeoutRef.current);
     scrollTimeoutRef.current = setTimeout(() => {
       isScrollingRef.current = null;
-    }, 50);
+    }, 60);
   };
 
   const scrollToLine = (lineNum: number) => {
     const targetIdx = Math.max(0, lineNum - 1);
-    const approxLineHeight = 22;
-    const targetScroll = targetIdx * approxLineHeight - 80;
+    const lineHeight = 24;
+    const targetScroll = Math.max(0, targetIdx * lineHeight - 60);
 
     if (leftPaneRef.current) {
-      leftPaneRef.current.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+      leftPaneRef.current.scrollTo({ top: targetScroll, behavior: 'smooth' });
     }
     if (rightPaneRef.current) {
-      rightPaneRef.current.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+      rightPaneRef.current.scrollTo({ top: targetScroll, behavior: 'smooth' });
     }
   };
 
@@ -117,17 +124,17 @@ export default function DiffWorkspace({
 
   const getPillColor = (type: EntityCategory, isWhitelisted = false) => {
     if (isWhitelisted) {
-      return 'bg-slate-200/80 text-slate-500 line-through border border-slate-300';
+      return 'bg-slate-200/90 text-slate-500 line-through border border-slate-300';
     }
     switch (type) {
-      case 'Credit Card': return 'bg-rose-100/90 text-rose-900 border border-rose-300 shadow-2xs font-semibold';
-      case 'Aadhaar': return 'bg-indigo-100/90 text-indigo-900 border border-indigo-300 shadow-2xs font-semibold';
-      case 'PAN': return 'bg-purple-100/90 text-purple-900 border border-purple-300 shadow-2xs font-semibold';
-      case 'Email': return 'bg-blue-100/90 text-blue-900 border border-blue-300 shadow-2xs font-semibold';
-      case 'Phone': return 'bg-cyan-100/90 text-cyan-900 border border-cyan-300 shadow-2xs font-semibold';
-      case 'IPv4': return 'bg-amber-100/90 text-amber-900 border border-amber-300 shadow-2xs font-semibold';
-      case 'Secret Token': return 'bg-orange-100/90 text-orange-900 border border-orange-300 shadow-2xs font-semibold';
-      case 'Custom': return 'bg-teal-100/90 text-teal-900 border border-teal-300 shadow-2xs font-semibold';
+      case 'Credit Card': return 'bg-rose-100 text-rose-900 border border-rose-300 shadow-2xs font-semibold';
+      case 'Aadhaar': return 'bg-indigo-100 text-indigo-900 border border-indigo-300 shadow-2xs font-semibold';
+      case 'PAN': return 'bg-purple-100 text-purple-900 border border-purple-300 shadow-2xs font-semibold';
+      case 'Email': return 'bg-blue-100 text-blue-900 border border-blue-300 shadow-2xs font-semibold';
+      case 'Phone': return 'bg-cyan-100 text-cyan-900 border border-cyan-300 shadow-2xs font-semibold';
+      case 'IPv4': return 'bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs font-semibold';
+      case 'Secret Token': return 'bg-orange-100 text-orange-900 border border-orange-300 shadow-2xs font-semibold';
+      case 'Custom': return 'bg-teal-100 text-teal-900 border border-teal-300 shadow-2xs font-semibold';
       default: return 'bg-slate-100 text-slate-900 border border-slate-300';
     }
   };
@@ -150,57 +157,73 @@ export default function DiffWorkspace({
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setPopoverPos({
-      top: rect.bottom + window.scrollY + 8,
-      left: Math.min(window.innerWidth - 320, Math.max(20, rect.left + window.scrollX - 100))
+      top: rect.bottom + window.scrollY + 6,
+      left: Math.min(window.innerWidth - 320, Math.max(16, rect.left + window.scrollX - 80))
     });
     setSelectedMatch(match);
   };
 
-  const renderInspectRaw = () => {
-    if (matches.length === 0) {
+  const renderInspectLine = (lineText: string, lineNo: number) => {
+    const lineMatches = matchesByLine.get(lineNo) || [];
+    if (lineMatches.length === 0) {
       return (
-        <pre className="font-mono text-xs text-slate-800 whitespace-pre-wrap break-all leading-[22px]">
-          {rawText}
-        </pre>
+        <span className="font-mono text-xs text-slate-800 whitespace-pre">
+          {lineText || ' '}
+        </span>
       );
     }
 
     const segments: React.ReactNode[] = [];
-    let lastIdx = 0;
-    const sorted = [...matches].sort((a, b) => a.start - b.start);
+    let curIdx = 0;
 
-    sorted.forEach((m, idx) => {
-      if (m.start > lastIdx) {
+    const occurrences: Array<{ start: number; end: number; match: PIIMatch }> = [];
+    for (const m of lineMatches) {
+      const idx = lineText.indexOf(m.value, curIdx);
+      if (idx !== -1) {
+        occurrences.push({ start: idx, end: idx + m.value.length, match: m });
+      }
+    }
+    occurrences.sort((a, b) => a.start - b.start);
+
+    let lastEnd = 0;
+    occurrences.forEach((occ, i) => {
+      if (occ.start > lastEnd) {
         segments.push(
-          <span key={`text_${idx}`}>{rawText.slice(lastIdx, m.start)}</span>
+          <span key={`plain_${i}`} className="whitespace-pre">
+            {lineText.slice(lastEnd, occ.start)}
+          </span>
         );
       }
-      const isWhite = whitelistedIds.has(m.id);
-      const isHighlighted = highlightedCategory ? m.type === highlightedCategory : false;
+      const isWhite = whitelistedIds.has(occ.match.id);
+      const isHighlighted = highlightedCategory ? occ.match.type === highlightedCategory : false;
 
       segments.push(
         <mark
-          key={`match_${m.id}`}
-          onClick={(e) => openMatchPopover(m, e)}
-          className={`cursor-pointer px-1 py-0.5 rounded text-xs transition-all ${getPillColor(m.type, isWhite)} ${
-            isHighlighted ? 'ring-2 ring-indigo-500 scale-105 inline-block' : ''
+          key={`mark_${occ.match.id}_${i}`}
+          onClick={(e) => openMatchPopover(occ.match, e)}
+          className={`cursor-pointer px-1 py-0.2 rounded text-[11px] transition-all whitespace-pre ${getPillColor(occ.match.type, isWhite)} ${
+            isHighlighted ? 'ring-2 ring-indigo-500 scale-105 inline-block font-bold' : ''
           }`}
-          title={`${m.type}: Click to inspect Python proof`}
+          title={`${occ.match.type}: Click to inspect Python proof`}
         >
-          {m.value}
+          {occ.match.value}
         </mark>
       );
-      lastIdx = m.end;
+      lastEnd = occ.end;
     });
 
-    if (lastIdx < rawText.length) {
-      segments.push(<span key="text_end">{rawText.slice(lastIdx)}</span>);
+    if (lastEnd < lineText.length) {
+      segments.push(
+        <span key="plain_end" className="whitespace-pre">
+          {lineText.slice(lastEnd)}
+        </span>
+      );
     }
 
     return (
-      <pre className="font-mono text-xs text-slate-800 whitespace-pre-wrap break-all leading-[22px]">
+      <span className="font-mono text-xs text-slate-800 whitespace-pre">
         {segments}
-      </pre>
+      </span>
     );
   };
 
@@ -213,18 +236,18 @@ export default function DiffWorkspace({
 
   return (
     <div className="relative mb-5">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-5 py-3 border-b border-slate-200 bg-slate-50/70 gap-3">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden flex flex-col">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 py-2.5 border-b border-slate-200 bg-slate-50/70 gap-2.5">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <FileText className="w-4 h-4 text-indigo-600" />
-              <span>{activeFile?.name || 'Raw Document Editor'}</span>
+            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5 whitespace-nowrap">
+              <FileText className="w-3.5 h-3.5 text-indigo-600" />
+              <span>{activeFile?.name || 'Raw Document Stream'}</span>
             </span>
-            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold uppercase bg-slate-200/80 text-slate-700">
-              {activeFormat || 'text'}
+            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold uppercase bg-slate-200/80 text-slate-700 whitespace-nowrap">
+              {activeFormat === 'text' ? 'txt' : activeFormat}
             </span>
             {activeFile?.size && (
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[10px] text-slate-400 whitespace-nowrap">
                 ({(activeFile.size / 1024).toFixed(1)} KB)
               </span>
             )}
@@ -234,24 +257,24 @@ export default function DiffWorkspace({
             <div className="flex bg-slate-200/80 p-0.5 rounded-lg border border-slate-300/60">
               <button
                 onClick={() => setViewMode('edit')}
-                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md transition-all whitespace-nowrap cursor-pointer ${
                   viewMode === 'edit'
-                    ? 'bg-white text-slate-900 shadow-xs'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Code className="w-3.5 h-3.5" />
+                <Code className="w-3 h-3" />
                 <span>Raw Editor</span>
               </button>
               <button
                 onClick={() => setViewMode('inspect')}
-                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md transition-all whitespace-nowrap cursor-pointer ${
                   viewMode === 'inspect'
-                    ? 'bg-white text-slate-900 shadow-xs'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                <Eye className="w-3 h-3 text-indigo-600" />
                 <span>X-Ray Inspect</span>
               </button>
             </div>
@@ -259,20 +282,20 @@ export default function DiffWorkspace({
             {isTabular && (
               <button
                 onClick={() => setShowTablePreview(!showTablePreview)}
-                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border transition-all ${
+                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border transition-all whitespace-nowrap cursor-pointer ${
                   showTablePreview
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs font-bold'
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                 }`}
               >
-                <Table2 className="w-3.5 h-3.5" />
+                <Table2 className="w-3 h-3" />
                 <span>Table Grid</span>
               </button>
             )}
 
             <button
               onClick={onCopySanitized}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors ml-1"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors whitespace-nowrap cursor-pointer"
             >
               {isCopied ? (
                 <>
@@ -290,13 +313,13 @@ export default function DiffWorkspace({
         </div>
 
         {showTablePreview && matrixData ? (
-          <div className="p-4 bg-slate-50/50 min-h-[480px]">
+          <div className="p-3 bg-slate-50/50 min-h-[480px]">
             <TablePreview matrix={matrixData} />
           </div>
         ) : (
-          <div className="relative grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 min-h-[500px] max-h-[640px]">
-            <div className="flex flex-col h-full overflow-hidden bg-slate-50/30">
-              <div className="px-4 py-2 border-b border-slate-100 bg-slate-100/50 flex items-center justify-between text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+          <div className="flex divide-x divide-slate-200 min-h-[520px] max-h-[660px] overflow-hidden">
+            <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/30 min-w-0">
+              <div className="px-3.5 py-1.5 border-b border-slate-100 bg-slate-100/50 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                 <span>Original Untrusted Stream</span>
                 <span>{rawLines.length} lines</span>
               </div>
@@ -304,33 +327,50 @@ export default function DiffWorkspace({
               <div
                 ref={leftPaneRef}
                 onScroll={handleLeftScroll}
-                className="flex-1 overflow-auto flex p-3 text-xs"
+                className="flex-1 overflow-auto p-2"
               >
-                <div className="select-none pr-3 text-right text-slate-300 font-mono text-[11px] leading-[22px] min-w-[32px] border-r border-slate-100 mr-3">
-                  {rawLines.map((_, i) => (
-                    <div key={i}>{i + 1}</div>
-                  ))}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  {viewMode === 'edit' ? (
+                {viewMode === 'edit' ? (
+                  <div className="flex">
+                    <div className="select-none pr-3 text-right text-slate-300 font-mono text-[11px] leading-[24px] min-w-[34px] border-r border-slate-100 mr-2">
+                      {rawLines.map((_, i) => (
+                        <div key={i} className="h-[24px]">{i + 1}</div>
+                      ))}
+                    </div>
                     <textarea
                       value={rawText}
                       onChange={(e) => onChangeRawText(e.target.value)}
                       placeholder="Paste text, log entries, or drag files here..."
-                      className="w-full h-full bg-transparent border-0 p-0 text-slate-900 font-mono text-xs leading-[22px] resize-none focus:outline-hidden"
+                      className="flex-1 bg-transparent border-0 p-0 text-slate-900 font-mono text-xs leading-[24px] whitespace-pre resize-none focus:outline-hidden"
                       spellCheck={false}
                     />
-                  ) : (
-                    renderInspectRaw()
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    {Array.from({ length: totalLines }).map((_, idx) => {
+                      const lineNo = idx + 1;
+                      const textLine = rawLines[idx] ?? '';
+                      return (
+                        <div
+                          key={`raw_row_${lineNo}`}
+                          className="flex items-center h-[24px] leading-[24px] hover:bg-slate-100/60 transition-colors"
+                        >
+                          <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 border-r border-slate-100 mr-2.5 flex-shrink-0">
+                            {lineNo}
+                          </span>
+                          <div className="flex-1 overflow-x-auto min-w-0 whitespace-pre">
+                            {renderInspectLine(textLine, lineNo)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="flex flex-col h-full overflow-hidden bg-white">
-              <div className="px-4 py-2 border-b border-slate-100 bg-slate-100/50 flex items-center justify-between text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                <span className="text-emerald-700 flex items-center gap-1 font-bold">
+            <div className="flex-1 flex flex-col h-full overflow-hidden bg-white min-w-0">
+              <div className="px-3.5 py-1.5 border-b border-slate-100 bg-slate-100/50 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <span className="text-emerald-700 flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                   Sanitized Zero-Leakage Stream
                 </span>
@@ -340,34 +380,50 @@ export default function DiffWorkspace({
               <div
                 ref={rightPaneRef}
                 onScroll={handleRightScroll}
-                className="flex-1 overflow-auto flex p-3 text-xs"
+                className="flex-1 overflow-auto p-2"
               >
-                <div className="select-none pr-3 text-right text-slate-300 font-mono text-[11px] leading-[22px] min-w-[32px] border-r border-slate-100 mr-3">
-                  {sanitizedLines.map((_, i) => (
-                    <div key={i}>{i + 1}</div>
-                  ))}
-                </div>
-
-                <div className="flex-1 min-w-0 font-mono text-xs leading-[22px] text-slate-800 whitespace-pre-wrap break-all">
-                  {sanitizedText}
+                <div className="flex flex-col">
+                  {Array.from({ length: totalLines }).map((_, idx) => {
+                    const lineNo = idx + 1;
+                    const textLine = sanitizedLines[idx] ?? '';
+                    return (
+                      <div
+                        key={`san_row_${lineNo}`}
+                        className="flex items-center h-[24px] leading-[24px] hover:bg-indigo-50/20 transition-colors"
+                      >
+                        <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 border-r border-slate-100 mr-2.5 flex-shrink-0">
+                          {lineNo}
+                        </span>
+                        <div className="flex-1 overflow-x-auto min-w-0 font-mono text-xs text-slate-800 whitespace-pre">
+                          {textLine}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
-            <div className="absolute right-0 top-10 bottom-0 w-3 bg-slate-100/70 border-l border-slate-200 hidden md:block">
+            <div 
+              className="w-7 border-l border-slate-200 bg-[#F8FAFC] relative flex-shrink-0 select-none hidden md:block"
+              title="PII Radar Scroll Minimap — click any marker to jump to line"
+            >
+              <div className="absolute top-1 left-0 right-0 text-[8px] font-bold text-center text-slate-400 uppercase tracking-tighter pointer-events-none">
+                Radar
+              </div>
               {activeMatches.map((m) => {
-                const fraction = Math.min(1, Math.max(0, (m.line - 1) / Math.max(totalLines, 1)));
+                const fraction = Math.min(0.96, Math.max(0.04, (m.line - 1) / Math.max(totalLines, 1)));
                 const topPercent = (fraction * 100).toFixed(1);
                 return (
                   <button
-                    key={m.id}
+                    key={`radar_${m.id}`}
                     onClick={() => scrollToLine(m.line)}
                     style={{ top: `${topPercent}%` }}
-                    className="absolute right-0.5 w-2 h-2 rounded-full transform -translate-y-1/2 hover:scale-150 transition-transform shadow-xs"
-                    title={`Line ${m.line}: ${m.type} (${m.value})`}
+                    className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 flex items-center justify-center hover:scale-150 transition-transform cursor-pointer"
+                    title={`Line ${m.line}: ${m.type} ("${m.value}")`}
                   >
                     <span
-                      className="block w-full h-full rounded-full"
+                      className="w-2 h-2 rounded-full shadow-2xs"
                       style={{ backgroundColor: getDotColor(m.type) }}
                     />
                   </button>
@@ -394,13 +450,13 @@ export default function DiffWorkspace({
             </div>
             <button
               onClick={() => setSelectedMatch(null)}
-              className="text-slate-400 hover:text-slate-600 p-0.5 rounded"
+              className="text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
             >
               ✕
             </button>
           </div>
 
-          <div className="my-3 space-y-2 text-xs">
+          <div className="my-2.5 space-y-2 text-xs">
             <div>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                 Python Engine Validation Proof
@@ -440,7 +496,7 @@ export default function DiffWorkspace({
                 onToggleWhitelist(selectedMatch.id);
                 setSelectedMatch(null);
               }}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors shadow-2xs ${
+              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors shadow-2xs cursor-pointer ${
                 whitelistedIds.has(selectedMatch.id)
                   ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'

@@ -139,6 +139,9 @@ function jsFormatPartialMask(etype, val) {
     if (v.includes('+91') || (digits.length === 12 && digits.startsWith('91'))) {
       return `+91-******${l4}`;
     }
+    if (v.includes('(')) {
+      return `(***) ***-${l4}`;
+    }
     return `******${l4}`;
   }
   if (etype === 'Email') {
@@ -196,11 +199,11 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
   const rejected = [];
 
   if (enabled.has('Credit Card')) {
-    const pat = /\b(?:\d{4}[ -]?){3}\d{1,7}\b|\b\d{13,19}\b/g;
+    const pat = /\b(?:\d{4}[ -]){3}\d{4}\b|\b\d{15,16}\b/g;
     let m;
     while ((m = pat.exec(text)) !== null) {
       const cleaned = m[0].replace(/[\s-]/g, '');
-      if (cleaned.length >= 13 && cleaned.length <= 19) {
+      if (cleaned.length === 15 || cleaned.length === 16) {
         if (jsLuhnValidate(m[0])) {
           candidates.push({
             start: m.index,
@@ -210,10 +213,11 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
             reason: 'Luhn Mod-10 Checksum Verified',
             severity: 'Critical'
           });
-        } else if (cleaned.length === 16) {
+        } else {
           rejected.push({
             value: m[0],
-            reason: 'Luhn Mod-10 Checksum Failed (Ignored 16-digit order/tracking ID)',
+            type: 'Credit Card',
+            reason: 'Luhn Mod-10 Checksum Failed (Ignored 16-digit serial/tracking ID)',
             line: text.slice(0, m.index).split('\n').length
           });
         }
@@ -222,7 +226,7 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
   }
 
   if (enabled.has('Aadhaar')) {
-    const pat = /\b[2-9]\d{3}[\s-]?\d{4}[\s-]?\d{4}\b/g;
+    const pat = /(?<!\w)[2-9]\d{3}[\s-]\d{4}[\s-]\d{4}\b|(?<!\w)[2-9]\d{11}\b/g;
     let m;
     while ((m = pat.exec(text)) !== null) {
       if (jsVerhoeffValidate(m[0])) {
@@ -237,7 +241,8 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
       } else {
         rejected.push({
           value: m[0],
-          reason: 'Verhoeff Checksum Failed (Ignored 12-digit invoice/serial ID)',
+          type: '12-Digit Aadhaar',
+          reason: 'Verhoeff Algorithm Checksum Failed (Ignored 12-digit order/invoice ID)',
           line: text.slice(0, m.index).split('\n').length
         });
       }
@@ -260,6 +265,7 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
       } else {
         rejected.push({
           value: m[0],
+          type: 'Indian PAN',
           reason: 'PAN Entity Code Invalid (Ignored alphanumeric code)',
           line: text.slice(0, m.index).split('\n').length
         });
@@ -268,7 +274,7 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
   }
 
   if (enabled.has('IPv4')) {
-    const pat = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
+    const pat = /(?<!\w)(?:\d{1,3}\.){3}\d{1,3}\b/g;
     let m;
     while ((m = pat.exec(text)) !== null) {
       if (jsIpv4Validate(m[0])) {
@@ -281,11 +287,15 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
           severity: 'Medium'
         });
       } else {
-        rejected.push({
-          value: m[0],
-          reason: 'IPv4 Octet Out of Range (0-255) (Ignored software version / invalid IP)',
-          line: text.slice(0, m.index).split('\n').length
-        });
+        const octs = m[0].split('.');
+        if (octs.some(o => /^\d+$/.test(o) && parseInt(o, 10) > 255)) {
+          rejected.push({
+            value: m[0],
+            type: 'IPv4 Address',
+            reason: 'IPv4 Octet Out of Range [0-255] (Ignored software version / invalid IP)',
+            line: text.slice(0, m.index).split('\n').length
+          });
+        }
       }
     }
   }
@@ -307,9 +317,9 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
 
   if (enabled.has('Phone')) {
     const pats = [
-      /(?:\+91[\s-]?)?[6789]\d{4}[\s-]?\d{5}\b/g,
-      /\b(?:\+1[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b/g,
-      /\b[6789]\d{9}\b/g
+      /(?<!\w)(?:\+1[\s-]?)?(?:\(\d{3}\)|\d{3})[\s-]?\d{3}[\s-]?\d{4}\b/g,
+      /(?<!\w)(?:\+91[\s-]?)?[6789]\d{4}[\s-]?\d{5}\b/g,
+      /(?<!\w)[6789]\d{9}\b/g
     ];
     for (const pat of pats) {
       let m;

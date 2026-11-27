@@ -194,6 +194,8 @@ def format_partial_mask(entity_type, val):
         last4 = digits[-4:] if len(digits) >= 4 else digits
         if '+91' in val_str or (len(digits) == 12 and digits.startswith('91')):
             return f"+91-******{last4}"
+        if '(' in val_str:
+            return f"(***) ***-{last4}"
         return f"******{last4}"
     if entity_type == 'Email':
         if '@' in val_str:
@@ -255,11 +257,11 @@ class PIISanitizer:
         rejected = []
 
         if 'Credit Card' in self.enabled_types:
-            card_pattern = re.compile(r'\b(?:\d{4}[ -]?){3}\d{1,7}\b|\b\d{13,19}\b')
+            card_pattern = re.compile(r'\b(?:\d{4}[ -]){3}\d{4}\b|\b\d{15,16}\b')
             for m in card_pattern.finditer(text):
                 raw_val = m.group(0)
                 cleaned = re.sub(r'[\s-]', '', raw_val)
-                if 13 <= len(cleaned) <= 19:
+                if len(cleaned) in (15, 16):
                     if luhn_validate(raw_val):
                         candidates.append({
                             'start': m.start(),
@@ -269,15 +271,16 @@ class PIISanitizer:
                             'reason': 'Luhn Mod-10 Checksum Verified',
                             'severity': SEVERITY_MAP['Credit Card']
                         })
-                    elif len(cleaned) == 16:
+                    else:
                         rejected.append({
                             'value': raw_val,
-                            'reason': 'Luhn Mod-10 Checksum Failed (Ignored 16-digit order/tracking ID)',
+                            'type': 'Credit Card',
+                            'reason': 'Luhn Mod-10 Checksum Failed (Ignored 16-digit serial/tracking ID)',
                             'line': text[:m.start()].count('\n') + 1
                         })
 
         if 'Aadhaar' in self.enabled_types:
-            aadhaar_pattern = re.compile(r'\b[2-9]\d{3}[\s-]?\d{4}[\s-]?\d{4}\b')
+            aadhaar_pattern = re.compile(r'(?<!\w)[2-9]\d{3}[\s-]\d{4}[\s-]\d{4}\b|(?<!\w)[2-9]\d{11}\b')
             for m in aadhaar_pattern.finditer(text):
                 raw_val = m.group(0)
                 if verhoeff_validate(raw_val):
@@ -292,7 +295,8 @@ class PIISanitizer:
                 else:
                     rejected.append({
                         'value': raw_val,
-                        'reason': 'Verhoeff Checksum Failed (Ignored 12-digit invoice/serial ID)',
+                        'type': '12-Digit Aadhaar',
+                        'reason': 'Verhoeff Algorithm Checksum Failed (Ignored 12-digit order/invoice ID)',
                         'line': text[:m.start()].count('\n') + 1
                     })
 
@@ -312,12 +316,13 @@ class PIISanitizer:
                 else:
                     rejected.append({
                         'value': raw_val,
+                        'type': 'Indian PAN',
                         'reason': 'PAN Entity Code Invalid (Ignored alphanumeric code)',
                         'line': text[:m.start()].count('\n') + 1
                     })
 
         if 'IPv4' in self.enabled_types:
-            ip_pattern = re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}\b')
+            ip_pattern = re.compile(r'(?<!\w)(?:\d{1,3}\.){3}\d{1,3}\b')
             for m in ip_pattern.finditer(text):
                 raw_val = m.group(0)
                 if ipv4_validate(raw_val):
@@ -330,11 +335,14 @@ class PIISanitizer:
                         'severity': SEVERITY_MAP['IPv4']
                     })
                 else:
-                    rejected.append({
-                        'value': raw_val,
-                        'reason': 'IPv4 Octet Out of Range (0-255) (Ignored software version / invalid IP)',
-                        'line': text[:m.start()].count('\n') + 1
-                    })
+                    octs = raw_val.split('.')
+                    if any(int(o) > 255 for o in octs if o.isdigit()):
+                        rejected.append({
+                            'value': raw_val,
+                            'type': 'IPv4 Address',
+                            'reason': 'IPv4 Octet Out of Range [0-255] (Ignored software version / invalid IP)',
+                            'line': text[:m.start()].count('\n') + 1
+                        })
 
         if 'Email' in self.enabled_types:
             email_pattern = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b')
@@ -351,9 +359,9 @@ class PIISanitizer:
 
         if 'Phone' in self.enabled_types:
             phone_patterns = [
-                re.compile(r'(?:\+91[\s-]?)?[6789]\d{4}[\s-]?\d{5}\b'),
-                re.compile(r'\b(?:\+1[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}\b'),
-                re.compile(r'\b[6789]\d{9}\b')
+                re.compile(r'(?<!\w)(?:\+1[\s-]?)?(?:\(\d{3}\)|\d{3})[\s-]?\d{3}[\s-]?\d{4}\b'),
+                re.compile(r'(?<!\w)(?:\+91[\s-]?)?[6789]\d{4}[\s-]?\d{5}\b'),
+                re.compile(r'(?<!\w)[6789]\d{9}\b')
             ]
             for pat in phone_patterns:
                 for m in pat.finditer(text):
@@ -368,7 +376,6 @@ class PIISanitizer:
                     })
 
         if 'Secret Token' in self.enabled_types:
-            secret_pattern = re.compile(r'(?i)(?:bearer\s+|api[_-]?key[:=\s]+|[a-z0-9_\-]{24,})')
             token_extractor = re.compile(r'\b[A-Za-z0-9_\-\.]{20,}\b')
             for m in token_extractor.finditer(text):
                 raw_val = m.group(0)
@@ -541,7 +548,6 @@ def process_csv(csv_text, options=None, pseudonym_map=None, counters=None):
     writer = csv.writer(out_stream, dialect=dialect)
 
     all_matches = []
-    total_text_builder = []
 
     for row_idx, row in enumerate(reader):
         sanitized_row = []

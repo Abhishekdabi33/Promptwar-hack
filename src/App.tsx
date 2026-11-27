@@ -95,7 +95,7 @@ export default function App() {
         id: 'sample_dossier',
         name: 'incident_dossier_7749.txt',
         size: sample.length,
-        format: 'text',
+        format: 'txt',
         rawText: sample
       }]);
       setActiveBatchIndex(0);
@@ -109,7 +109,8 @@ export default function App() {
   }, [loadInitialSample]);
 
   const activeFile = batchFiles[activeBatchIndex] || null;
-  const activeFormat = activeFile?.format || 'text';
+  const rawFormat = activeFile?.format || 'txt';
+  const activeFormat = rawFormat === 'text' ? 'txt' : rawFormat;
 
   const runSanitization = useCallback(async (textToProcess: string) => {
     if (!textToProcess) {
@@ -189,7 +190,7 @@ export default function App() {
         id: `clip_${Date.now()}`,
         name: 'clipboard_snippet.txt',
         size: clipText.length,
-        format: 'text',
+        format: 'txt',
         rawText: clipText
       };
       setBatchFiles([newFile]);
@@ -208,7 +209,8 @@ export default function App() {
     const newBatch: BatchFile[] = [];
     for (let i = 0; i < filesList.length; i++) {
       const file = filesList[i];
-      const fmt = detectFormat(file.name);
+      const rawFmt = detectFormat(file.name);
+      const fmt = rawFmt === 'text' ? 'txt' : rawFmt;
       const fileId = `file_${Date.now()}_${i}`;
 
       try {
@@ -542,7 +544,7 @@ export default function App() {
         onFileChange={(e) => handleProcessIncomingFiles(e.target.files)}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
         {activeTab === 'promptlog' ? (
           <PromptLogTab />
         ) : (

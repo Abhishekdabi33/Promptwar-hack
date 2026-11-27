@@ -28,6 +28,7 @@ export interface PIIMatch {
 
 export interface RejectedTrap {
   value: string;
+  type: string;
   reason: string;
   line: number;
 }
