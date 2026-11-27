@@ -215,6 +215,8 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
           });
         } else {
           rejected.push({
+            start: m.index,
+            end: m.index + m[0].length,
             value: m[0],
             type: 'Credit Card',
             reason: 'Luhn Mod-10 Checksum Failed (Ignored 16-digit serial/tracking ID)',
@@ -226,7 +228,7 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
   }
 
   if (enabled.has('Aadhaar')) {
-    const pat = /(?<!\w)[2-9]\d{3}[\s-]\d{4}[\s-]\d{4}\b|(?<!\w)[2-9]\d{11}\b/g;
+    const pat = /(?<!\w)[2-9]\d{3}[\s-]\d{4}[\s-]\d{4}(?![\s-]?\d)|(?<!\w)[2-9]\d{11}(?!\d)/g;
     let m;
     while ((m = pat.exec(text)) !== null) {
       if (jsVerhoeffValidate(m[0])) {
@@ -240,6 +242,8 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
         });
       } else {
         rejected.push({
+          start: m.index,
+          end: m.index + m[0].length,
           value: m[0],
           type: '12-Digit Aadhaar',
           reason: 'Verhoeff Algorithm Checksum Failed (Ignored 12-digit order/invoice ID)',
@@ -264,6 +268,8 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
         });
       } else {
         rejected.push({
+          start: m.index,
+          end: m.index + m[0].length,
           value: m[0],
           type: 'Indian PAN',
           reason: 'PAN Entity Code Invalid (Ignored alphanumeric code)',
@@ -274,7 +280,7 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
   }
 
   if (enabled.has('IPv4')) {
-    const pat = /(?<!\w)(?:\d{1,3}\.){3}\d{1,3}\b/g;
+    const pat = /(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])/g;
     let m;
     while ((m = pat.exec(text)) !== null) {
       if (jsIpv4Validate(m[0])) {
@@ -290,6 +296,8 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
         const octs = m[0].split('.');
         if (octs.some(o => /^\d+$/.test(o) && parseInt(o, 10) > 255)) {
           rejected.push({
+            start: m.index,
+            end: m.index + m[0].length,
             value: m[0],
             type: 'IPv4 Address',
             reason: 'IPv4 Octet Out of Range [0-255] (Ignored software version / invalid IP)',
@@ -468,13 +476,31 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
     compliance.push('GDPR');
   }
 
+  rejected.sort((a, b) => {
+    if (a.start !== b.start) return a.start - b.start;
+    return (b.end - b.start) - (a.end - a.start);
+  });
+  const dedupedRejected = [];
+  let lastTrapEnd = -1;
+  for (const r of rejected) {
+    if (r.start >= lastTrapEnd) {
+      dedupedRejected.push({
+        value: r.value,
+        type: r.type,
+        reason: r.reason,
+        line: r.line
+      });
+      lastTrapEnd = r.end;
+    }
+  }
+
   return {
     sanitized_text: sanitizedText,
     matches,
     active_matches_count: activeMatches.length,
     entity_counts: entityCounts,
-    rejected_traps_count: rejected.length,
-    rejected_traps: rejected,
+    rejected_traps_count: dedupedRejected.length,
+    rejected_traps: dedupedRejected,
     risk_score: riskScore,
     risk_tier: riskTier,
     compliance_frameworks: compliance,

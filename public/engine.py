@@ -273,6 +273,8 @@ class PIISanitizer:
                         })
                     else:
                         rejected.append({
+                            'start': m.start(),
+                            'end': m.end(),
                             'value': raw_val,
                             'type': 'Credit Card',
                             'reason': 'Luhn Mod-10 Checksum Failed (Ignored 16-digit serial/tracking ID)',
@@ -280,7 +282,7 @@ class PIISanitizer:
                         })
 
         if 'Aadhaar' in self.enabled_types:
-            aadhaar_pattern = re.compile(r'(?<!\w)[2-9]\d{3}[\s-]\d{4}[\s-]\d{4}\b|(?<!\w)[2-9]\d{11}\b')
+            aadhaar_pattern = re.compile(r'(?<!\w)[2-9]\d{3}[\s-]\d{4}[\s-]\d{4}(?![\s-]?\d)|(?<!\w)[2-9]\d{11}(?!\d)')
             for m in aadhaar_pattern.finditer(text):
                 raw_val = m.group(0)
                 if verhoeff_validate(raw_val):
@@ -294,6 +296,8 @@ class PIISanitizer:
                     })
                 else:
                     rejected.append({
+                        'start': m.start(),
+                        'end': m.end(),
                         'value': raw_val,
                         'type': '12-Digit Aadhaar',
                         'reason': 'Verhoeff Algorithm Checksum Failed (Ignored 12-digit order/invoice ID)',
@@ -315,6 +319,8 @@ class PIISanitizer:
                     })
                 else:
                     rejected.append({
+                        'start': m.start(),
+                        'end': m.end(),
                         'value': raw_val,
                         'type': 'Indian PAN',
                         'reason': 'PAN Entity Code Invalid (Ignored alphanumeric code)',
@@ -322,7 +328,7 @@ class PIISanitizer:
                     })
 
         if 'IPv4' in self.enabled_types:
-            ip_pattern = re.compile(r'(?<!\w)(?:\d{1,3}\.){3}\d{1,3}\b')
+            ip_pattern = re.compile(r'(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])')
             for m in ip_pattern.finditer(text):
                 raw_val = m.group(0)
                 if ipv4_validate(raw_val):
@@ -338,6 +344,8 @@ class PIISanitizer:
                     octs = raw_val.split('.')
                     if any(int(o) > 255 for o in octs if o.isdigit()):
                         rejected.append({
+                            'start': m.start(),
+                            'end': m.end(),
                             'value': raw_val,
                             'type': 'IPv4 Address',
                             'reason': 'IPv4 Octet Out of Range [0-255] (Ignored software version / invalid IP)',
@@ -415,7 +423,20 @@ class PIISanitizer:
                 except Exception:
                     pass
 
-        self.rejected_traps.extend(rejected)
+        rejected.sort(key=lambda x: (x['start'], -(x['end'] - x['start'])))
+        deduped_rejected = []
+        occupied_end = -1
+        for r in rejected:
+            if r['start'] >= occupied_end:
+                deduped_rejected.append({
+                    'value': r['value'],
+                    'type': r['type'],
+                    'reason': r['reason'],
+                    'line': r['line']
+                })
+                occupied_end = r['end']
+
+        self.rejected_traps.extend(deduped_rejected)
         return candidates
 
     def resolve_overlaps(self, text, candidates):

@@ -48,13 +48,13 @@ export default function DiffWorkspace({
   const [selectedMatch, setSelectedMatch] = useState<PIIMatch | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
-  const leftPaneRef = useRef<HTMLDivElement>(null);
-  const rightPaneRef = useRef<HTMLDivElement>(null);
-  const isScrollingRef = useRef<'left' | 'right' | null>(null);
-  const scrollTimeoutRef = useRef<any>(null);
+  const unifiedScrollRef = useRef<HTMLDivElement>(null);
 
-  const rawLines = useMemo(() => rawText.split('\n'), [rawText]);
-  const sanitizedLines = useMemo(() => sanitizedText.split('\n'), [sanitizedText]);
+  const trimmedRaw = useMemo(() => rawText.replace(/\r?\n$/, ''), [rawText]);
+  const trimmedSanitized = useMemo(() => sanitizedText.replace(/\r?\n$/, ''), [sanitizedText]);
+
+  const rawLines = useMemo(() => (trimmedRaw ? trimmedRaw.split('\n') : ['']), [trimmedRaw]);
+  const sanitizedLines = useMemo(() => (trimmedSanitized ? trimmedSanitized.split('\n') : ['']), [trimmedSanitized]);
   const totalLines = Math.max(rawLines.length, sanitizedLines.length);
 
   const activeMatches = useMemo(() => {
@@ -70,44 +70,10 @@ export default function DiffWorkspace({
     return map;
   }, [matches]);
 
-  const handleLeftScroll = () => {
-    if (isScrollingRef.current === 'right') return;
-    isScrollingRef.current = 'left';
-
-    if (leftPaneRef.current && rightPaneRef.current) {
-      rightPaneRef.current.scrollTop = leftPaneRef.current.scrollTop;
-    }
-
-    clearTimeout(scrollTimeoutRef.current);
-    scrollTimeoutRef.current = setTimeout(() => {
-      isScrollingRef.current = null;
-    }, 60);
-  };
-
-  const handleRightScroll = () => {
-    if (isScrollingRef.current === 'left') return;
-    isScrollingRef.current = 'right';
-
-    if (leftPaneRef.current && rightPaneRef.current) {
-      leftPaneRef.current.scrollTop = rightPaneRef.current.scrollTop;
-    }
-
-    clearTimeout(scrollTimeoutRef.current);
-    scrollTimeoutRef.current = setTimeout(() => {
-      isScrollingRef.current = null;
-    }, 60);
-  };
-
   const scrollToLine = (lineNum: number) => {
-    const targetIdx = Math.max(0, lineNum - 1);
-    const lineHeight = 24;
-    const targetScroll = Math.max(0, targetIdx * lineHeight - 60);
-
-    if (leftPaneRef.current) {
-      leftPaneRef.current.scrollTo({ top: targetScroll, behavior: 'smooth' });
-    }
-    if (rightPaneRef.current) {
-      rightPaneRef.current.scrollTo({ top: targetScroll, behavior: 'smooth' });
+    const el = document.getElementById(`diff_row_${lineNum}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   };
 
@@ -163,11 +129,25 @@ export default function DiffWorkspace({
     setSelectedMatch(match);
   };
 
+  const formatTokenFallback = (type: EntityCategory) => {
+    switch (type) {
+      case 'Email': return '[REDACTED_EMAIL]';
+      case 'Credit Card': return '[REDACTED_CARD]';
+      case 'Aadhaar': return '[REDACTED_AADHAAR]';
+      case 'PAN': return '[REDACTED_PAN]';
+      case 'Secret Token': return '[REDACTED_SECRET]';
+      case 'IPv4': return '[REDACTED_IPV4]';
+      case 'Phone': return '[REDACTED_PHONE]';
+      case 'Custom': return '[REDACTED_CUSTOM]';
+      default: return '[REDACTED]';
+    }
+  };
+
   const renderInspectLine = (lineText: string, lineNo: number) => {
-    const lineMatches = matchesByLine.get(lineNo) || [];
+    const lineMatches = (matchesByLine.get(lineNo) || []).slice().sort((a, b) => a.start - b.start);
     if (lineMatches.length === 0) {
       return (
-        <span className="font-mono text-xs text-slate-800 whitespace-pre">
+        <span className="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words break-all">
           {lineText || ' '}
         </span>
       );
@@ -175,12 +155,13 @@ export default function DiffWorkspace({
 
     const segments: React.ReactNode[] = [];
     let curIdx = 0;
-
     const occurrences: Array<{ start: number; end: number; match: PIIMatch }> = [];
+
     for (const m of lineMatches) {
       const idx = lineText.indexOf(m.value, curIdx);
       if (idx !== -1) {
         occurrences.push({ start: idx, end: idx + m.value.length, match: m });
+        curIdx = idx + m.value.length;
       }
     }
     occurrences.sort((a, b) => a.start - b.start);
@@ -189,7 +170,7 @@ export default function DiffWorkspace({
     occurrences.forEach((occ, i) => {
       if (occ.start > lastEnd) {
         segments.push(
-          <span key={`plain_${i}`} className="whitespace-pre">
+          <span key={`raw_plain_${i}`} className="whitespace-pre-wrap break-words break-all">
             {lineText.slice(lastEnd, occ.start)}
           </span>
         );
@@ -201,8 +182,8 @@ export default function DiffWorkspace({
         <mark
           key={`mark_${occ.match.id}_${i}`}
           onClick={(e) => openMatchPopover(occ.match, e)}
-          className={`cursor-pointer px-1 py-0.2 rounded text-[11px] transition-all whitespace-pre ${getPillColor(occ.match.type, isWhite)} ${
-            isHighlighted ? 'ring-2 ring-indigo-500 scale-105 inline-block font-bold' : ''
+          className={`cursor-pointer px-1.5 py-0.5 rounded text-[11px] font-mono transition-all inline-block ${getPillColor(occ.match.type, isWhite)} ${
+            isHighlighted ? 'ring-2 ring-indigo-500 scale-105 font-bold' : ''
           }`}
           title={`${occ.match.type}: Click to inspect Python proof`}
         >
@@ -214,14 +195,84 @@ export default function DiffWorkspace({
 
     if (lastEnd < lineText.length) {
       segments.push(
-        <span key="plain_end" className="whitespace-pre">
+        <span key="raw_plain_end" className="whitespace-pre-wrap break-words break-all">
           {lineText.slice(lastEnd)}
         </span>
       );
     }
 
     return (
-      <span className="font-mono text-xs text-slate-800 whitespace-pre">
+      <span className="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words break-all">
+        {segments}
+      </span>
+    );
+  };
+
+  const renderSanitizedLine = (lineText: string, lineNo: number) => {
+    const lineMatches = (matchesByLine.get(lineNo) || []).slice().sort((a, b) => a.start - b.start);
+    if (lineMatches.length === 0) {
+      return (
+        <span className="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words break-all">
+          {lineText || ' '}
+        </span>
+      );
+    }
+
+    const segments: React.ReactNode[] = [];
+    let curSearchIdx = 0;
+    const occurrences: Array<{ start: number; end: number; match: PIIMatch; token: string }> = [];
+
+    for (const m of lineMatches) {
+      const isWhite = whitelistedIds.has(m.id);
+      const token = isWhite ? m.value : (m.redacted_value || formatTokenFallback(m.type));
+      if (!token) continue;
+      const idx = lineText.indexOf(token, curSearchIdx);
+      if (idx !== -1) {
+        occurrences.push({ start: idx, end: idx + token.length, match: m, token });
+        curSearchIdx = idx + token.length;
+      }
+    }
+
+    occurrences.sort((a, b) => a.start - b.start);
+
+    let lastEnd = 0;
+    occurrences.forEach((occ, i) => {
+      if (occ.start > lastEnd) {
+        segments.push(
+          <span key={`san_plain_${i}`} className="whitespace-pre-wrap break-words break-all">
+            {lineText.slice(lastEnd, occ.start)}
+          </span>
+        );
+      }
+
+      const isWhite = whitelistedIds.has(occ.match.id);
+      const isHighlighted = highlightedCategory ? occ.match.type === highlightedCategory : false;
+
+      segments.push(
+        <mark
+          key={`san_mark_${occ.match.id}_${i}`}
+          onClick={(e) => openMatchPopover(occ.match, e)}
+          className={`cursor-pointer px-1.5 py-0.5 rounded text-[11px] font-mono transition-all inline-block ${getPillColor(occ.match.type, isWhite)} ${
+            isHighlighted ? 'ring-2 ring-indigo-500 scale-105 font-bold' : ''
+          }`}
+          title={`${occ.match.type}: Click to view cryptographic proof`}
+        >
+          {occ.token}
+        </mark>
+      );
+      lastEnd = occ.end;
+    });
+
+    if (lastEnd < lineText.length) {
+      segments.push(
+        <span key="san_plain_end" className="whitespace-pre-wrap break-words break-all">
+          {lineText.slice(lastEnd)}
+        </span>
+      );
+    }
+
+    return (
+      <span className="font-mono text-xs text-slate-800 whitespace-pre-wrap break-words break-all">
         {segments}
       </span>
     );
@@ -317,91 +368,92 @@ export default function DiffWorkspace({
             <TablePreview matrix={matrixData} />
           </div>
         ) : (
-          <div className="flex divide-x divide-slate-200 min-h-[520px] max-h-[660px] overflow-hidden">
-            <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/30 min-w-0">
-              <div className="px-3.5 py-1.5 border-b border-slate-100 bg-slate-100/50 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                <span>Original Untrusted Stream</span>
-                <span>{rawLines.length} lines</span>
+          <div className="flex h-[540px] overflow-hidden">
+            <div 
+              ref={unifiedScrollRef}
+              className="flex-1 overflow-y-auto divide-y divide-slate-100"
+            >
+              <div className="sticky top-0 z-10 grid grid-cols-2 divide-x divide-slate-200 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 shadow-2xs">
+                <div className="px-3.5 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <span>Original Untrusted Stream</span>
+                  <span>{rawLines.length} lines</span>
+                </div>
+                <div className="px-3.5 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100/95">
+                  <span className="text-emerald-700 flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    Sanitized Zero-Leakage Stream
+                  </span>
+                  <span>{sanitizedLines.length} lines</span>
+                </div>
               </div>
 
-              <div
-                ref={leftPaneRef}
-                onScroll={handleLeftScroll}
-                className="flex-1 overflow-auto p-2"
-              >
-                {viewMode === 'edit' ? (
-                  <div className="flex">
-                    <div className="select-none pr-3 text-right text-slate-300 font-mono text-[11px] leading-[24px] min-w-[34px] border-r border-slate-100 mr-2">
+              {viewMode === 'edit' ? (
+                <div className="grid grid-cols-2 divide-x divide-slate-200 min-h-full">
+                  <div className="flex p-2 bg-slate-50/30">
+                    <div className="select-none pr-3 text-right text-slate-300 font-mono text-[11px] leading-[22px] min-w-[34px] border-r border-slate-100 mr-2">
                       {rawLines.map((_, i) => (
-                        <div key={i} className="h-[24px]">{i + 1}</div>
+                        <div key={i} className="leading-[22px]">{i + 1}</div>
                       ))}
                     </div>
                     <textarea
                       value={rawText}
                       onChange={(e) => onChangeRawText(e.target.value)}
                       placeholder="Paste text, log entries, or drag files here..."
-                      className="flex-1 bg-transparent border-0 p-0 text-slate-900 font-mono text-xs leading-[24px] whitespace-pre resize-none focus:outline-hidden"
+                      className="flex-1 bg-transparent border-0 p-0 text-slate-900 font-mono text-xs leading-[22px] whitespace-pre-wrap break-words resize-none focus:outline-hidden"
                       spellCheck={false}
                     />
                   </div>
-                ) : (
-                  <div className="flex flex-col">
+                  <div className="p-2 bg-white">
                     {Array.from({ length: totalLines }).map((_, idx) => {
                       const lineNo = idx + 1;
-                      const textLine = rawLines[idx] ?? '';
+                      const textLine = sanitizedLines[idx] ?? '';
                       return (
-                        <div
-                          key={`raw_row_${lineNo}`}
-                          className="flex items-center h-[24px] leading-[24px] hover:bg-slate-100/60 transition-colors"
-                        >
-                          <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 border-r border-slate-100 mr-2.5 flex-shrink-0">
+                        <div key={`edit_san_${lineNo}`} className="flex items-start leading-[22px]">
+                          <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
                             {lineNo}
                           </span>
-                          <div className="flex-1 overflow-x-auto min-w-0 whitespace-pre">
-                            {renderInspectLine(textLine, lineNo)}
+                          <div className="flex-1 min-w-0 font-mono text-xs text-slate-800 whitespace-pre-wrap break-words break-all">
+                            {renderSanitizedLine(textLine, lineNo)}
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex-1 flex flex-col h-full overflow-hidden bg-white min-w-0">
-              <div className="px-3.5 py-1.5 border-b border-slate-100 bg-slate-100/50 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                <span className="text-emerald-700 flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  Sanitized Zero-Leakage Stream
-                </span>
-                <span>{sanitizedLines.length} lines</span>
-              </div>
-
-              <div
-                ref={rightPaneRef}
-                onScroll={handleRightScroll}
-                className="flex-1 overflow-auto p-2"
-              >
-                <div className="flex flex-col">
+                </div>
+              ) : (
+                <div>
                   {Array.from({ length: totalLines }).map((_, idx) => {
                     const lineNo = idx + 1;
-                    const textLine = sanitizedLines[idx] ?? '';
+                    const rawLineText = rawLines[idx] ?? '';
+                    const sanLineText = sanitizedLines[idx] ?? '';
                     return (
                       <div
-                        key={`san_row_${lineNo}`}
-                        className="flex items-center h-[24px] leading-[24px] hover:bg-indigo-50/20 transition-colors"
+                        key={`diff_row_${lineNo}`}
+                        id={`diff_row_${lineNo}`}
+                        className="grid grid-cols-2 divide-x divide-slate-200 hover:bg-slate-50/60 transition-colors"
                       >
-                        <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 border-r border-slate-100 mr-2.5 flex-shrink-0">
-                          {lineNo}
-                        </span>
-                        <div className="flex-1 overflow-x-auto min-w-0 font-mono text-xs text-slate-800 whitespace-pre">
-                          {textLine}
+                        <div className="flex items-start min-w-0 px-2 py-1 leading-[22px] bg-slate-50/20">
+                          <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
+                            {lineNo}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            {renderInspectLine(rawLineText, lineNo)}
+                          </div>
+                        </div>
+
+                        <div className="flex items-start min-w-0 px-2 py-1 leading-[22px] bg-white">
+                          <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
+                            {lineNo}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            {renderSanitizedLine(sanLineText, lineNo)}
+                          </div>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              </div>
+              )}
             </div>
 
             <div 
