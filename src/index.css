@@ -6,12 +6,6 @@ html, body {
   margin: 0;
   padding: 0;
   background-color: #F8FAFC;
-  background-image: 
-    radial-gradient(at 12% 16%, rgba(224, 242, 254, 0.75) 0px, transparent 45%),
-    radial-gradient(at 88% 22%, rgba(238, 242, 255, 0.8) 0px, transparent 50%),
-    radial-gradient(at 52% 88%, rgba(243, 232, 255, 0.6) 0px, transparent 55%),
-    radial-gradient(at 20% 82%, rgba(240, 253, 250, 0.6) 0px, transparent 40%);
-  background-attachment: fixed;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: #0F172A;
   min-height: 100vh;

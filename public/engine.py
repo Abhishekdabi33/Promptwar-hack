@@ -39,10 +39,14 @@ VERHOEFF_INV = (0, 4, 3, 2, 1, 5, 6, 7, 8, 9)
 PAN_ENTITY_CODES = {'P', 'C', 'H', 'F', 'A', 'T', 'B', 'L', 'J', 'G'}
 
 PRIORITY_MAP = {
+    'Password': 110,
+    'OTP': 105,
     'Credit Card': 100,
     'Aadhaar': 90,
     'PAN': 80,
+    'Financial': 75,
     'Secret Token': 70,
+    'Suspicious Link': 65,
     'Email': 60,
     'IPv4': 50,
     'Phone': 40,
@@ -50,21 +54,29 @@ PRIORITY_MAP = {
 }
 
 SEVERITY_MAP = {
+    'Password': 'Critical',
+    'OTP': 'Critical',
     'Credit Card': 'Critical',
     'Aadhaar': 'Critical',
     'Secret Token': 'Critical',
+    'Financial': 'High',
     'PAN': 'High',
     'Phone': 'High',
+    'Suspicious Link': 'High',
     'Email': 'Medium',
     'IPv4': 'Medium',
     'Custom': 'Low'
 }
 
 WEIGHT_MAP = {
+    'Password': 35,
+    'OTP': 35,
     'Credit Card': 35,
     'Aadhaar': 30,
     'Secret Token': 30,
+    'Financial': 25,
     'PAN': 20,
+    'Suspicious Link': 20,
     'Phone': 15,
     'Email': 10,
     'IPv4': 5,
@@ -175,12 +187,26 @@ def format_full_mask(entity_type):
         'Secret Token': '[REDACTED_SECRET]',
         'IPv4': '[REDACTED_IPV4]',
         'Phone': '[REDACTED_PHONE]',
+        'OTP': '[REDACTED_OTP]',
+        'Password': '[REDACTED_PASSWORD]',
+        'Financial': '[REDACTED_FINANCIAL]',
+        'Suspicious Link': '[REDACTED_LINK]',
         'Custom': '[REDACTED_CUSTOM]'
     }
     return tag_map.get(entity_type, '[REDACTED]')
 
 def format_partial_mask(entity_type, val):
     val_str = str(val).strip()
+    if entity_type == 'OTP':
+        return '******'
+    if entity_type == 'Password':
+        return '********'
+    if entity_type == 'Financial':
+        if '@' in val_str:
+            return f"****@{val_str.split('@')[-1]}"
+        return f"{val_str[:4]}****"
+    if entity_type == 'Suspicious Link':
+        return '[LINK_HIDDEN]'
     if entity_type == 'Credit Card':
         digits = re.sub(r'[\s-]', '', val_str)
         last4 = digits[-4:] if len(digits) >= 4 else digits
@@ -231,6 +257,10 @@ def get_or_create_pseudonym(entity_type, val, pseudonym_map, counters):
         'Secret Token': 'SECRET',
         'IPv4': 'IPV4',
         'Phone': 'PHONE',
+        'OTP': 'OTP',
+        'Password': 'PWD',
+        'Financial': 'FIN',
+        'Suspicious Link': 'LINK',
         'Custom': 'USER'
     }
     prefix = prefix_map.get(entity_type, 'TOKEN')
@@ -244,7 +274,8 @@ class PIISanitizer:
         self.options = options or {}
         self.redaction_mode = self.options.get('redaction_mode', 'full')
         self.enabled_types = set(self.options.get('enabled_types', [
-            'Credit Card', 'Aadhaar', 'PAN', 'Email', 'Phone', 'IPv4', 'Secret Token', 'Custom'
+            'Credit Card', 'Aadhaar', 'PAN', 'Email', 'Phone', 'IPv4', 'Secret Token',
+            'OTP', 'Password', 'Financial', 'Suspicious Link', 'Custom'
         ]))
         self.custom_rules = self.options.get('custom_rules', [])
         self.whitelisted_ids = set(self.options.get('whitelisted_ids', []))
@@ -399,6 +430,86 @@ class PIISanitizer:
                         'reason': f'Shannon Entropy: {ent:.2f} bits/char',
                         'severity': SEVERITY_MAP['Secret Token']
                     })
+
+        if 'OTP' in self.enabled_types:
+            otp_context_pat = re.compile(r'(?i)\b(?:otp|one[\s-]*time[\s-]*password|verification[\s-]*code|security[\s-]*code|cvv|pin)(?:[\s:=]+|[\s]+is[\s:=]+)([0-9]{4,8})\b')
+            for m in otp_context_pat.finditer(text):
+                code_val = m.group(1)
+                candidates.append({
+                    'start': m.start(1),
+                    'end': m.end(1),
+                    'type': 'OTP',
+                    'value': code_val,
+                    'reason': 'One-Time Security Verification Code / PIN',
+                    'severity': SEVERITY_MAP['OTP']
+                })
+
+        if 'Password' in self.enabled_types:
+            pwd_pat = re.compile(r'(?i)\b(?:password|passwd|pwd|passcode|secret_key)(?:[\s:=]+|[\s]+is[\s:=]+)([^\s,;!\'\"\n]{4,64})')
+            for m in pwd_pat.finditer(text):
+                pwd_val = m.group(1)
+                candidates.append({
+                    'start': m.start(1),
+                    'end': m.end(1),
+                    'type': 'Password',
+                    'value': pwd_val,
+                    'reason': 'Plaintext Credential / Password Assignment',
+                    'severity': SEVERITY_MAP['Password']
+                })
+
+        if 'Financial' in self.enabled_types:
+            upi_pat = re.compile(r'\b[a-zA-Z0-9.\-_]{2,64}@(okaxis|okhdfcbank|okicici|oksbi|paytm|ybl|ibl|axl|upi|gpay|apl|postbank|jupiteraxis)\b', re.IGNORECASE)
+            for m in upi_pat.finditer(text):
+                candidates.append({
+                    'start': m.start(),
+                    'end': m.end(),
+                    'type': 'Financial',
+                    'value': m.group(0),
+                    'reason': 'Indian UPI Virtual Payment Address (VPA)',
+                    'severity': SEVERITY_MAP['Financial']
+                })
+            ifsc_pat = re.compile(r'\b[A-Z]{4}0[A-Z0-9]{6}\b')
+            for m in ifsc_pat.finditer(text):
+                candidates.append({
+                    'start': m.start(),
+                    'end': m.end(),
+                    'type': 'Financial',
+                    'value': m.group(0),
+                    'reason': 'Indian Financial System Code (IFSC)',
+                    'severity': SEVERITY_MAP['Financial']
+                })
+
+        if 'Suspicious Link' in self.enabled_types:
+            short_pat = re.compile(r'\b(?:https?:\/\/)?(?:bit\.ly|tinyurl\.com|t\.co|goo\.gl|is\.gd|buff\.ly|ow\.ly|cutt\.ly|rb\.gy)\/[A-Za-z0-9_-]+\b', re.IGNORECASE)
+            for m in short_pat.finditer(text):
+                candidates.append({
+                    'start': m.start(),
+                    'end': m.end(),
+                    'type': 'Suspicious Link',
+                    'value': m.group(0),
+                    'reason': 'Shortened URL (Obfuscated Target Destination)',
+                    'severity': SEVERITY_MAP['Suspicious Link']
+                })
+            ip_url_pat = re.compile(r'\bhttps?:\/\/(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?(?:\/[^\s]*)?\b')
+            for m in ip_url_pat.finditer(text):
+                candidates.append({
+                    'start': m.start(),
+                    'end': m.end(),
+                    'type': 'Suspicious Link',
+                    'value': m.group(0),
+                    'reason': 'Direct IP URL (Circumvents Domain Reputation)',
+                    'severity': SEVERITY_MAP['Suspicious Link']
+                })
+            insecure_login_pat = re.compile(r'\bhttp:\/\/[^\s]+(?:login|signin|account|bank|verify|auth|pay)[^\s]*\b', re.IGNORECASE)
+            for m in insecure_login_pat.finditer(text):
+                candidates.append({
+                    'start': m.start(),
+                    'end': m.end(),
+                    'type': 'Suspicious Link',
+                    'value': m.group(0),
+                    'reason': 'Unencrypted HTTP Authentication / Payment Link',
+                    'severity': SEVERITY_MAP['Suspicious Link']
+                })
 
         if 'Custom' in self.enabled_types:
             for rule in self.custom_rules:
@@ -918,6 +1029,120 @@ def process_cell_matrix(matrix, options=None, pseudonym_map=None, counters=None)
         'risk_tier': risk_tier,
         'compliance_frameworks': compliance,
         'pseudonym_vault': sanitizer.pseudonym_map
+    }
+
+def analyze_message_safety(text, options=None, pseudonym_map=None, counters=None):
+    opts = options or {}
+    all_types = [
+        'Password', 'OTP', 'Credit Card', 'Aadhaar', 'PAN', 'Financial',
+        'Secret Token', 'Suspicious Link', 'Email', 'Phone', 'IPv4', 'Custom'
+    ]
+    opts_copy = dict(opts)
+    if 'enabled_types' not in opts_copy:
+        opts_copy['enabled_types'] = all_types
+    res = process_text(text, opts_copy, pseudonym_map, counters)
+
+    counts = res.get('entity_counts', {})
+    advisories = []
+    has_critical = False
+    has_high = False
+
+    if counts.get('OTP', 0) > 0:
+        has_critical = True
+        advisories.append({
+            'id': 'adv_otp',
+            'category': 'OTP & Verification Codes',
+            'title': 'Contains One-Time Password (OTP) or PIN',
+            'description': 'One-time verification codes grant direct account takeover access.',
+            'recommendation': 'Never share OTPs or verification PINs in chat or email. Official institutions will never request them.',
+            'severity': 'Critical'
+        })
+    if counts.get('Password', 0) > 0:
+        has_critical = True
+        advisories.append({
+            'id': 'adv_pwd',
+            'category': 'Plaintext Passwords',
+            'title': 'Contains Plaintext Passwords or Credentials',
+            'description': 'Credentials sent in cleartext can be logged, scraped, or leaked by external tools.',
+            'recommendation': 'Use an end-to-end encrypted secret manager rather than plain message channels.',
+            'severity': 'Critical'
+        })
+    if counts.get('Credit Card', 0) > 0:
+        has_critical = True
+        advisories.append({
+            'id': 'adv_card',
+            'category': 'Payment Cards',
+            'title': 'Contains Valid Credit or Debit Card Numbers',
+            'description': 'Sharing full PAN card numbers violates PCI-DSS compliance and risks fraud.',
+            'recommendation': 'Mask all except the last 4 digits before sending.',
+            'severity': 'Critical'
+        })
+    if counts.get('Secret Token', 0) > 0:
+        has_critical = True
+        advisories.append({
+            'id': 'adv_secret',
+            'category': 'API Keys & Tokens',
+            'title': 'Contains High-Entropy API Keys or Bearer Tokens',
+            'description': 'Exposing bearer tokens or secrets enables unauthorized programmatic API access.',
+            'recommendation': 'Revoke exposed tokens immediately and use environment variables.',
+            'severity': 'Critical'
+        })
+    if counts.get('Aadhaar', 0) > 0 or counts.get('PAN', 0) > 0:
+        has_high = True
+        advisories.append({
+            'id': 'adv_govt_id',
+            'category': 'National Identity Numbers',
+            'title': 'Contains Aadhaar or PAN Identity Numbers',
+            'description': 'Government identity identifiers can be weaponized for impersonation and identity theft.',
+            'recommendation': 'Redact government identification numbers unless sending via a sanctioned, encrypted portal.',
+            'severity': 'High'
+        })
+    if counts.get('Financial', 0) > 0:
+        has_high = True
+        advisories.append({
+            'id': 'adv_fin',
+            'category': 'Financial Details',
+            'title': 'Contains Indian Financial Routing (UPI / IFSC)',
+            'description': 'Payment handles or bank branch codes expose account routing pathways.',
+            'recommendation': 'Verify beneficiary authenticity before sending funds or transfer coordinates.',
+            'severity': 'High'
+        })
+    if counts.get('Suspicious Link', 0) > 0:
+        has_high = True
+        advisories.append({
+            'id': 'adv_link',
+            'category': 'Suspicious Links',
+            'title': 'Contains Shortened, Insecure, or Direct-IP Links',
+            'description': 'Shortened URLs mask the true destination and may lead to phishing or malware gateways.',
+            'recommendation': 'Expand and inspect destination URLs before clicking or forwarding.',
+            'severity': 'High'
+        })
+    if counts.get('Email', 0) > 0 or counts.get('Phone', 0) > 0:
+        advisories.append({
+            'id': 'adv_contact',
+            'category': 'Contact Information',
+            'title': 'Contains Direct Contact Information (Email / Phone)',
+            'description': 'Personal phone numbers and email addresses can lead to unsolicited phishing or social engineering.',
+            'recommendation': 'Ensure recipient is trusted before exposing direct phone numbers or email addresses.',
+            'severity': 'Medium'
+        })
+
+    if has_critical:
+        verdict = 'Unsafe to Send'
+        color = 'rose'
+    elif has_high or len(advisories) > 0:
+        verdict = 'Review Recommended'
+        color = 'amber'
+    else:
+        verdict = 'Safe to Send'
+        color = 'emerald'
+
+    return {
+        'verdict': verdict,
+        'color': color,
+        'advisories': advisories,
+        'sanitization_result': res,
+        'safe_text': res.get('sanitized_text', text)
     }
 
 def generate_verhoeff_aadhaar():

@@ -108,32 +108,44 @@ export default function DiffWorkspace({
 
   const getPillColor = (type: EntityCategory, isWhitelisted = false) => {
     if (isWhitelisted) {
-      return 'bg-slate-200/90 text-slate-500 line-through border border-slate-300';
+      return 'bg-slate-200 text-slate-500 line-through border border-slate-300';
     }
     switch (type) {
-      case 'Credit Card': return 'bg-rose-100 text-rose-900 border border-rose-300 shadow-2xs font-semibold';
-      case 'Aadhaar': return 'bg-indigo-100 text-indigo-900 border border-indigo-300 shadow-2xs font-semibold';
-      case 'PAN': return 'bg-purple-100 text-purple-900 border border-purple-300 shadow-2xs font-semibold';
-      case 'Email': return 'bg-blue-100 text-blue-900 border border-blue-300 shadow-2xs font-semibold';
-      case 'Phone': return 'bg-cyan-100 text-cyan-900 border border-cyan-300 shadow-2xs font-semibold';
-      case 'IPv4': return 'bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs font-semibold';
-      case 'Secret Token': return 'bg-orange-100 text-orange-900 border border-orange-300 shadow-2xs font-semibold';
-      case 'Custom': return 'bg-teal-100 text-teal-900 border border-teal-300 shadow-2xs font-semibold';
-      default: return 'bg-slate-100 text-slate-900 border border-slate-300';
+      case 'Credit Card':
+      case 'Aadhaar':
+      case 'PAN':
+      case 'Secret Token':
+      case 'Password':
+      case 'OTP':
+        return 'bg-rose-50 text-rose-800 border border-rose-200 shadow-2xs font-medium';
+      case 'Email':
+      case 'Phone':
+      case 'IPv4':
+      case 'Financial':
+      case 'Suspicious Link':
+        return 'bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs font-medium';
+      default:
+        return 'bg-slate-100 text-slate-700 border border-slate-200 font-medium';
     }
   };
 
   const getDotColor = (type: EntityCategory) => {
     switch (type) {
-      case 'Credit Card': return '#E11D48';
-      case 'Aadhaar': return '#4F46E5';
-      case 'PAN': return '#9333EA';
-      case 'Email': return '#2563EB';
-      case 'Phone': return '#0891B2';
-      case 'IPv4': return '#D97706';
-      case 'Secret Token': return '#EA580C';
-      case 'Custom': return '#0D9488';
-      default: return '#64748B';
+      case 'Credit Card':
+      case 'Aadhaar':
+      case 'PAN':
+      case 'Secret Token':
+      case 'Password':
+      case 'OTP':
+        return '#E11D48';
+      case 'Email':
+      case 'Phone':
+      case 'IPv4':
+      case 'Financial':
+      case 'Suspicious Link':
+        return '#D97706';
+      default:
+        return '#64748B';
     }
   };
 
@@ -154,6 +166,10 @@ export default function DiffWorkspace({
       case 'Aadhaar': return '[REDACTED_AADHAAR]';
       case 'PAN': return '[REDACTED_PAN]';
       case 'Secret Token': return '[REDACTED_SECRET]';
+      case 'OTP': return '[REDACTED_OTP]';
+      case 'Password': return '[REDACTED_PASSWORD]';
+      case 'Financial': return '[REDACTED_FINANCIAL]';
+      case 'Suspicious Link': return '[REDACTED_LINK]';
       case 'IPv4': return '[REDACTED_IPV4]';
       case 'Phone': return '[REDACTED_PHONE]';
       case 'Custom': return '[REDACTED_CUSTOM]';
@@ -311,20 +327,20 @@ export default function DiffWorkspace({
     sub: string;
     icon: React.ComponentType<{ className?: string }>;
   }> = [
-    { id: 'full', label: 'Full Mask', sub: '[REDACTED]', icon: EyeOff },
+    { id: 'full', label: 'Full Redaction', sub: '[REDACTED]', icon: EyeOff },
     { id: 'partial', label: 'Partial Mask', sub: 'XXXX-1234', icon: Eye },
-    { id: 'pseudonym', label: 'Consistent Pseudonym', sub: 'TOKEN_01', icon: Shuffle }
+    { id: 'pseudonym', label: 'Consistent Pseudonyms', sub: 'TOKEN_01', icon: Shuffle }
   ];
 
   return (
     <div className="relative mb-3">
-      <div className="bg-white/80 backdrop-blur-xl rounded-3xl border border-white/90 shadow-sm ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
-        <div className="px-4 py-2.5 border-b border-slate-200/80 bg-white/60 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
+        <div className="px-4 py-2.5 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
               Redaction Policy:
             </span>
-            <div className="inline-flex p-0.5 bg-slate-100/90 rounded-xl border border-slate-200/70 gap-1 flex-wrap sm:flex-nowrap">
+            <div className="inline-flex p-0.5 bg-slate-200/60 rounded-lg gap-1 flex-wrap sm:flex-nowrap">
               {modes.map((m) => {
                 const active = redactionMode === m.id;
                 const Icon = m.icon;
@@ -332,13 +348,13 @@ export default function DiffWorkspace({
                   <button
                     key={m.id}
                     onClick={() => onChangeRedactionMode(m.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap ${
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-colors cursor-pointer whitespace-nowrap ${
                       active
-                        ? 'bg-white text-indigo-900 shadow-2xs border border-slate-200/90 font-bold'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                        ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                    <Icon className="w-3.5 h-3.5 text-slate-700 flex-shrink-0" />
                     <span>{m.label}</span>
                     <span className="text-[10px] text-slate-400 font-mono hidden md:inline">
                       ({m.sub})
@@ -352,9 +368,9 @@ export default function DiffWorkspace({
           <div className="flex items-center gap-2 justify-end">
             <button
               onClick={onOpenInputHub}
-              className="inline-flex items-center gap-1 px-3 py-1 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 shadow-2xs transition-all cursor-pointer whitespace-nowrap hover:border-indigo-300"
+              className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
             >
-              <Plus className="w-3.5 h-3.5 text-indigo-600" />
+              <Plus className="w-3.5 h-3.5 text-slate-600" />
               <span>Add / Switch File</span>
             </button>
           </div>
@@ -407,49 +423,49 @@ export default function DiffWorkspace({
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200/80 border-b border-slate-200/80 bg-slate-50/80 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-b border-slate-200 bg-slate-50 text-xs">
               <div className="flex items-center justify-between px-4 py-2 gap-2 min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
-                  <FileText className="w-4 h-4 text-indigo-600 flex-shrink-0" />
-                  <span className="font-bold text-slate-800 truncate" title={activeFile?.name || 'Raw Document Stream'}>
-                    {activeFile?.name || 'Raw Document Stream'}
+                  <FileText className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                  <span className="font-semibold text-slate-800 truncate" title={activeFile?.name || 'Original Input'}>
+                    {activeFile?.name || 'Original Input'}
                   </span>
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold uppercase bg-slate-200/90 text-slate-700 flex-shrink-0">
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium uppercase bg-slate-200 text-slate-700 flex-shrink-0">
                     {activeFormat === 'text' ? 'txt' : activeFormat}
                   </span>
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <div className="flex bg-slate-200/80 p-0.5 rounded-xl border border-slate-300/60">
+                  <div className="flex bg-slate-200/80 p-0.5 rounded-lg">
                     <button
                       onClick={() => setViewMode('edit')}
-                      className={`flex items-center gap-1 px-2.5 py-0.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                      className={`flex items-center gap-1 px-2.5 py-0.5 rounded-md transition-colors cursor-pointer whitespace-nowrap ${
                         viewMode === 'edit'
-                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          ? 'bg-white text-slate-900 shadow-2xs font-semibold'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
-                      title="Edit raw text live"
+                      title="Edit raw text directly"
                     >
-                      <Edit3 className="w-3 h-3 text-indigo-600" />
-                      <span>Edit Text</span>
+                      <Edit3 className="w-3 h-3 text-slate-600" />
+                      <span>Edit</span>
                     </button>
                     <button
                       onClick={() => setViewMode('inspect')}
-                      className={`flex items-center gap-1 px-2.5 py-0.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                      className={`flex items-center gap-1 px-2.5 py-0.5 rounded-md transition-colors cursor-pointer whitespace-nowrap ${
                         viewMode === 'inspect'
-                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          ? 'bg-white text-slate-900 shadow-2xs font-semibold'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
-                      title="View validated PII entity highlights"
+                      title="Inspect entity matches"
                     >
-                      <Eye className="w-3 h-3 text-indigo-600" />
-                      <span>X-Ray View</span>
+                      <Eye className="w-3 h-3 text-slate-600" />
+                      <span>Inspect</span>
                     </button>
                   </div>
 
                   <button
                     onClick={onPasteClipboard}
-                    className="p-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition-colors cursor-pointer"
+                    className="p-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition-colors cursor-pointer"
                     title="Paste from clipboard"
                   >
                     <ClipboardPaste className="w-3.5 h-3.5" />
@@ -457,7 +473,7 @@ export default function DiffWorkspace({
 
                   <button
                     onClick={onOpenInputHub}
-                    className="p-1 rounded-lg text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 transition-colors cursor-pointer"
+                    className="p-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition-colors cursor-pointer"
                     title="+ Add File or Document"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -465,7 +481,7 @@ export default function DiffWorkspace({
 
                   <button
                     onClick={onClearInput}
-                    className="p-1 rounded-lg text-rose-600 hover:text-rose-800 hover:bg-rose-50 transition-colors cursor-pointer"
+                    className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                     title="Clear input"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -473,12 +489,12 @@ export default function DiffWorkspace({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between px-4 py-2 gap-2 min-w-0 bg-slate-50/50">
-                <div className="flex items-center gap-2 text-emerald-800 font-bold min-w-0">
+              <div className="flex items-center justify-between px-4 py-2 gap-2 min-w-0 bg-slate-50">
+                <div className="flex items-center gap-2 text-slate-800 font-semibold min-w-0">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                  <span className="truncate">Sanitized Zero-Leakage Stream</span>
-                  <span className="px-2 py-0.2 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 whitespace-nowrap hidden sm:inline">
-                    {redactionMode === 'full' ? 'Full Mask' : redactionMode === 'partial' ? 'Partial Mask' : 'Consistent Pseudonym'}
+                  <span className="truncate">Sanitized Output</span>
+                  <span className="px-2 py-0.2 rounded-full text-[10px] font-medium bg-slate-200 text-slate-700 whitespace-nowrap hidden sm:inline">
+                    {redactionMode === 'full' ? 'Full Redaction' : redactionMode === 'partial' ? 'Partial Mask' : 'Consistent Pseudonyms'}
                   </span>
                 </div>
 
@@ -488,7 +504,7 @@ export default function DiffWorkspace({
                       onClick={() => setShowTablePreview(!showTablePreview)}
                       className={`flex items-center gap-1 px-2.5 py-0.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                         showTablePreview
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
                           : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
@@ -499,7 +515,7 @@ export default function DiffWorkspace({
 
                   <button
                     onClick={onCopySanitized}
-                    className="flex items-center gap-1 px-3 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+                    className="flex items-center gap-1 px-3 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
                   >
                     {isCopied ? (
                       <>
@@ -518,7 +534,7 @@ export default function DiffWorkspace({
             </div>
 
             {showTablePreview && matrixData ? (
-              <div className="p-3 bg-slate-50/50 min-h-[480px]">
+              <div className="p-3 bg-slate-50 min-h-[480px]">
                 <TablePreview matrix={matrixData} />
               </div>
             ) : (
@@ -527,15 +543,15 @@ export default function DiffWorkspace({
                   ref={unifiedScrollRef}
                   className="flex-1 overflow-y-auto divide-y divide-slate-100"
                 >
-                  <div className="sticky top-0 z-10 grid grid-cols-2 divide-x divide-slate-200/80 bg-slate-100/90 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
+                  <div className="sticky top-0 z-10 grid grid-cols-2 divide-x divide-slate-200 bg-slate-100 border-b border-slate-200 shadow-2xs">
                     <div className="px-4 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                      <span>Original Untrusted Stream</span>
+                      <span>Original Input</span>
                       <span>{rawLines.length} lines</span>
                     </div>
-                    <div className="px-4 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100/90">
-                      <span className="text-emerald-700 flex items-center gap-1">
+                    <div className="px-4 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100">
+                      <span className="text-slate-800 flex items-center gap-1">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                        Sanitized Output Stream
+                        Sanitized Output
                       </span>
                       <span>{sanitizedLines.length} lines</span>
                     </div>
@@ -615,12 +631,9 @@ export default function DiffWorkspace({
                 </div>
 
                 <div 
-                  className="w-7 border-l border-slate-200/80 bg-[#F8FAFC] relative flex-shrink-0 select-none hidden md:block"
-                  title="PII Radar Scroll Minimap — click any marker to jump to line"
+                  className="w-6 border-l border-slate-200 bg-slate-50 relative flex-shrink-0 select-none hidden md:block"
+                  title="Entity location minimap — click to jump to line"
                 >
-                  <div className="absolute top-1 left-0 right-0 text-[8px] font-bold text-center text-slate-400 uppercase tracking-tighter pointer-events-none">
-                    Radar
-                  </div>
                   {activeMatches.map((m) => {
                     const fraction = Math.min(0.96, Math.max(0.04, (m.line - 1) / Math.max(totalLines, 1)));
                     const topPercent = (fraction * 100).toFixed(1);
@@ -629,11 +642,11 @@ export default function DiffWorkspace({
                         key={`radar_${m.id}`}
                         onClick={() => scrollToLine(m.line)}
                         style={{ top: `${topPercent}%` }}
-                        className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 flex items-center justify-center hover:scale-150 transition-transform cursor-pointer"
+                        className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 flex items-center justify-center hover:scale-150 transition-transform cursor-pointer"
                         title={`Line ${m.line}: ${m.type} ("${m.value}")`}
                       >
                         <span
-                          className="w-2 h-2 rounded-full shadow-2xs"
+                          className="w-1.5 h-1.5 rounded-full shadow-2xs"
                           style={{ backgroundColor: getDotColor(m.type) }}
                         />
                       </button>
@@ -671,7 +684,7 @@ export default function DiffWorkspace({
           <div className="my-2.5 space-y-2 text-xs">
             <div>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Python Engine Validation Proof
+                Validation Proof
               </span>
               <div className="mt-0.5 text-slate-800 font-medium bg-slate-50 p-1.5 rounded-md border border-slate-100 font-mono text-[11px]">
                 ✓ {selectedMatch.reason}
@@ -680,7 +693,7 @@ export default function DiffWorkspace({
 
             <div>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Original Sensitive Entity
+                Detected Entity
               </span>
               <div className="mt-0.5 text-rose-800 bg-rose-50/70 p-1.5 rounded-md border border-rose-100 font-mono text-[11px] break-all">
                 {selectedMatch.value}
@@ -690,7 +703,7 @@ export default function DiffWorkspace({
             {selectedMatch.redacted_value && (
               <div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Redacted Transformation
+                  Redacted Value
                 </span>
                 <div className="mt-0.5 text-emerald-800 bg-emerald-50/70 p-1.5 rounded-md border border-emerald-100 font-mono text-[11px] break-all">
                   {selectedMatch.redacted_value}
@@ -710,7 +723,7 @@ export default function DiffWorkspace({
               }}
               className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors shadow-2xs cursor-pointer ${
                 whitelistedIds.has(selectedMatch.id)
-                  ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  ? 'bg-slate-900 text-white hover:bg-slate-800'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
               }`}
             >

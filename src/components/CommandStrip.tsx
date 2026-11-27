@@ -63,21 +63,25 @@ export default function CommandStrip({
     icon: React.ComponentType<{ className?: string }>;
     color: string;
   }> = [
-    { key: 'Credit Card', label: 'Cards', icon: CreditCard, color: 'border-rose-300 bg-rose-50/80 text-rose-800' },
-    { key: 'Aadhaar', label: 'Aadhaar', icon: Fingerprint, color: 'border-indigo-300 bg-indigo-50/80 text-indigo-800' },
-    { key: 'PAN', label: 'PAN', icon: FileBadge, color: 'border-purple-300 bg-purple-50/80 text-purple-800' },
-    { key: 'Email', label: 'Email', icon: Mail, color: 'border-blue-300 bg-blue-50/80 text-blue-800' },
-    { key: 'Phone', label: 'Phone', icon: Phone, color: 'border-cyan-300 bg-cyan-50/80 text-cyan-800' },
-    { key: 'IPv4', label: 'IPv4', icon: Network, color: 'border-amber-300 bg-amber-50/80 text-amber-800' },
-    { key: 'Secret Token', label: 'Secrets', icon: KeyRound, color: 'border-orange-300 bg-orange-50/80 text-orange-800' },
-    { key: 'Custom', label: 'Custom', icon: Sparkles, color: 'border-teal-300 bg-teal-50/80 text-teal-800' }
+    { key: 'Credit Card', label: 'Cards', icon: CreditCard, color: 'border-rose-200 bg-rose-50 text-rose-800' },
+    { key: 'Aadhaar', label: 'Aadhaar', icon: Fingerprint, color: 'border-rose-200 bg-rose-50 text-rose-800' },
+    { key: 'PAN', label: 'PAN', icon: FileBadge, color: 'border-rose-200 bg-rose-50 text-rose-800' },
+    { key: 'Password', label: 'Credentials', icon: KeyRound, color: 'border-rose-200 bg-rose-50 text-rose-800' },
+    { key: 'OTP', label: 'OTP/PIN', icon: ShieldCheck, color: 'border-rose-200 bg-rose-50 text-rose-800' },
+    { key: 'Secret Token', label: 'API Keys', icon: KeyRound, color: 'border-rose-200 bg-rose-50 text-rose-800' },
+    { key: 'Financial', label: 'UPI/IFSC', icon: CreditCard, color: 'border-amber-200 bg-amber-50 text-amber-800' },
+    { key: 'Suspicious Link', label: 'Risky Links', icon: Network, color: 'border-amber-200 bg-amber-50 text-amber-800' },
+    { key: 'Email', label: 'Email', icon: Mail, color: 'border-amber-200 bg-amber-50 text-amber-800' },
+    { key: 'Phone', label: 'Phone', icon: Phone, color: 'border-amber-200 bg-amber-50 text-amber-800' },
+    { key: 'IPv4', label: 'IPv4', icon: Network, color: 'border-slate-200 bg-slate-100 text-slate-800' },
+    { key: 'Custom', label: 'Custom', icon: Sparkles, color: 'border-slate-200 bg-slate-100 text-slate-700' }
   ];
 
   const activeCategories = categories.filter((c) => (entityCounts[c.key] || 0) > 0);
 
   return (
     <>
-      <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-white/90 shadow-sm ring-1 ring-slate-200/60 px-4 py-2.5 mb-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-xs px-4 py-2.5 mb-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex items-center gap-3 flex-shrink-0">
           <div className="relative w-12 h-12 flex-shrink-0 flex items-center justify-center">
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 48 48">

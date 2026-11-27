@@ -86,7 +86,7 @@ export default function TablePreview({ matrix = [], onExportCsv }: TablePreviewP
           <thead className="sticky top-0 bg-slate-100/90 backdrop-blur-xs text-slate-800 font-semibold border-b border-slate-200 z-10">
             <tr>
               <th className="px-3 py-2 text-[10px] text-slate-400 font-mono w-12 border-r border-slate-200 text-center">
-                #
+                Row
               </th>
               {headers.map((h, idx) => (
                 <th

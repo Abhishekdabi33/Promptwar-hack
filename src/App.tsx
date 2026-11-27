@@ -6,6 +6,7 @@ import ExportBar from './components/ExportBar';
 import InputHubModal from './components/InputHubModal';
 import DetectorDrawer from './components/DetectorDrawer';
 import PromptLogTab from './components/PromptLogTab';
+import MessageGuardView from './components/MessageGuardView';
 import Toast from './components/Toast';
 import { 
   initPyodideWorker, 
@@ -22,7 +23,18 @@ import {
   downloadText, 
   createBatchZip 
 } from './utils/fileHandlers';
-import { UploadCloud } from 'lucide-react';
+import { 
+  UploadCloud, 
+  FileText, 
+  Shield, 
+  Sparkles, 
+  ChevronDown, 
+  FileCode, 
+  FileSpreadsheet, 
+  ClipboardPaste, 
+  Plus, 
+  Trash2 
+} from 'lucide-react';
 import { 
   WorkerStatus, 
   TabType, 
@@ -31,7 +43,8 @@ import {
   BatchFile, 
   SanitizationResult, 
   ToastItem, 
-  EntityCategory 
+  EntityCategory,
+  AppMode 
 } from './types';
 
 export default function App() {
@@ -41,11 +54,16 @@ export default function App() {
     message: 'Booting Python WASM Worker...'
   });
   const [activeTab, setActiveTab] = useState<TabType>('studio');
+  const [appMode, setAppMode] = useState<AppMode>('sanitizer');
   const [rawText, setRawText] = useState('');
   const [sanitizedResult, setSanitizedResult] = useState<SanitizationResult | null>(null);
+  const [messageGuardText, setMessageGuardText] = useState('');
+  const [messageGuardResult, setMessageGuardResult] = useState<SanitizationResult | null>(null);
+  const [showDemoDropdown, setShowDemoDropdown] = useState(false);
   const [redactionMode, setRedactionMode] = useState<RedactionMode>('full');
   const [enabledTypes, setEnabledTypes] = useState<Set<string>>(new Set([
-    'Credit Card', 'Aadhaar', 'PAN', 'Email', 'Phone', 'IPv4', 'Secret Token', 'Custom'
+    'Credit Card', 'Aadhaar', 'PAN', 'Email', 'Phone', 'IPv4', 'Secret Token',
+    'OTP', 'Password', 'Financial', 'Suspicious Link', 'Custom'
   ]));
   const [customRules, setCustomRules] = useState<CustomRule[]>([]);
   const [whitelistedIds, setWhitelistedIds] = useState<Set<string>>(new Set());
@@ -66,6 +84,7 @@ export default function App() {
   const sharedCountersRef = useRef<Record<string, number>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const processTimeoutRef = useRef<any>(null);
+  const guardTimeoutRef = useRef<any>(null);
 
   const addToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = `toast_${Date.now()}_${Math.random()}`;
@@ -86,27 +105,6 @@ export default function App() {
     });
     return () => unsub();
   }, []);
-
-  const loadInitialSample = useCallback(async () => {
-    try {
-      const sample = await generateSampleWithWorker('mixed');
-      setRawText(sample);
-      setBatchFiles([{
-        id: 'sample_dossier',
-        name: 'incident_dossier_7749.txt',
-        size: sample.length,
-        format: 'txt',
-        rawText: sample
-      }]);
-      setActiveBatchIndex(0);
-    } catch (err) {
-      setRawText('Sample generation failed. Please type or paste text.');
-    }
-  }, []);
-
-  useEffect(() => {
-    loadInitialSample();
-  }, [loadInitialSample]);
 
   const activeFile = batchFiles[activeBatchIndex] || null;
   const rawFormat = activeFile?.format || 'txt';
@@ -150,6 +148,38 @@ export default function App() {
     }, 150);
     return () => clearTimeout(processTimeoutRef.current);
   }, [rawText, runSanitization]);
+
+  useEffect(() => {
+    if (appMode !== 'message_guard') return;
+    if (!messageGuardText.trim()) {
+      setMessageGuardResult(null);
+      return;
+    }
+
+    clearTimeout(guardTimeoutRef.current);
+    guardTimeoutRef.current = setTimeout(async () => {
+      try {
+        const options = {
+          redaction_mode: redactionMode,
+          enabled_types: Array.from(enabledTypes),
+          custom_rules: customRules,
+          whitelisted_ids: []
+        };
+        const res = await processWithWorker({
+          format: 'text',
+          content: messageGuardText,
+          options,
+          pseudonymMap: sharedPseudonymMapRef.current,
+          counters: sharedCountersRef.current
+        });
+        setMessageGuardResult(res);
+      } catch (err) {
+        addToast('Message safety scan encountered an error', 'error');
+      }
+    }, 150);
+
+    return () => clearTimeout(guardTimeoutRef.current);
+  }, [messageGuardText, appMode, redactionMode, enabledTypes, customRules]);
 
   useEffect(() => {
     let active = true;
@@ -214,7 +244,7 @@ export default function App() {
 
       setBatchFiles([newFile]);
       setActiveBatchIndex(0);
-      addToast(`Loaded ${name} with valid entities & false-positive traps!`);
+      addToast(`Loaded ${name}`);
     } catch (err) {
       addToast('Failed to load sample', 'error');
     }
@@ -239,7 +269,7 @@ export default function App() {
       setActiveBatchIndex(0);
       setWhitelistedIds(new Set());
       setSelectedCategory(null);
-      addToast('Pasted document from clipboard!');
+      addToast('Pasted text from clipboard');
     } catch (err) {
       addToast('Please grant clipboard permission or use Ctrl+V', 'error');
     }
@@ -321,7 +351,7 @@ export default function App() {
       setWhitelistedIds(new Set());
       setSelectedCategory(null);
       setCurrentEntityIndex(0);
-      addToast(`Added ${newBatch.length} file(s) to processing queue!`);
+      addToast(`Added ${newBatch.length} file(s) to processing queue`);
     }
   };
 
@@ -363,7 +393,7 @@ export default function App() {
 
   const handleAddCustomRule = (rule: CustomRule) => {
     setCustomRules(prev => [...prev, rule]);
-    addToast(`Added custom rule: ${rule.value}`);
+    addToast(`Added rule: ${rule.value}`);
   };
 
   const handleRemoveCustomRule = (id: string) => {
@@ -383,7 +413,7 @@ export default function App() {
     const textToCopy = sanitizedResult?.sanitized_text || rawText;
     navigator.clipboard.writeText(textToCopy);
     setIsCopied(true);
-    addToast('Sanitized clean text copied to clipboard!');
+    addToast('Sanitized clean text copied to clipboard');
     setTimeout(() => setIsCopied(false), 2000);
   };
 
@@ -396,19 +426,19 @@ export default function App() {
 
     if (activeFormat === 'docx' && activeFile?.sanitizedBlob) {
       downloadBlob(activeFile.sanitizedBlob, filename);
-      addToast('Downloaded sanitized .docx file!');
+      addToast('Downloaded sanitized .docx file');
       return;
     }
 
     downloadText(textToDownload, filename);
-    addToast(`Downloaded sanitized .${ext} file!`);
+    addToast(`Downloaded sanitized .${ext} file`);
   };
 
   const handleDownloadAuditReport = () => {
     if (!sanitizedResult) return;
     const auditObj = {
-      system: "PII Shield Zero-Leakage Privacy Engine",
-      runtime: "Pyodide Python 3.12 Web Worker (WASM)",
+      system: "PII Shield Privacy Engine",
+      runtime: "Pyodide Python 3.12 Web Worker",
       timestamp: new Date().toISOString(),
       raw_sha256: liveRawHash || sanitizedResult.raw_sha256,
       sanitized_sha256: liveSanitizedHash || sanitizedResult.sanitized_sha256,
@@ -430,7 +460,7 @@ export default function App() {
 
     const auditJson = JSON.stringify(auditObj, null, 2);
     downloadText(auditJson, `audit_report_${Date.now()}.json`, 'application/json');
-    addToast('Downloaded cryptographic audit report JSON!');
+    addToast('Downloaded audit report JSON');
   };
 
   const handleDownloadVault = () => {
@@ -441,7 +471,7 @@ export default function App() {
       reversible_entity_map: sharedPseudonymMapRef.current
     }, null, 2);
     downloadText(vaultJson, `pseudonym_vault_${Date.now()}.json`, 'application/json');
-    addToast('Downloaded pseudonym vault dictionary!');
+    addToast('Downloaded pseudonym key dictionary');
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -462,12 +492,14 @@ export default function App() {
     }
   };
 
+  const hasSanitizerContent = Boolean(rawText.trim() || batchFiles.length > 0);
+
   return (
     <div
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="min-h-screen text-[#0F172A] relative flex flex-col"
+      className="min-h-screen bg-slate-50 text-slate-900 relative flex flex-col font-sans"
     >
       <input
         ref={fileInputRef}
@@ -485,19 +517,19 @@ export default function App() {
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
-          className="fixed inset-0 z-50 bg-indigo-900/25 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-6"
         >
-          <div className="bg-white/95 backdrop-blur-2xl rounded-3xl border-2 border-dashed border-indigo-500 p-10 text-center max-w-lg shadow-2xl ring-8 ring-indigo-500/10">
-            <UploadCloud className="w-14 h-14 text-indigo-600 mx-auto mb-3 animate-bounce" />
-            <h3 className="text-lg font-bold text-slate-900 mb-1">
-              Drop Document to Sanitize Locally
+          <div className="bg-white rounded-2xl border-2 border-dashed border-slate-900 p-8 text-center max-w-md shadow-2xl">
+            <UploadCloud className="w-12 h-12 text-slate-900 mx-auto mb-3" />
+            <h3 className="text-base font-semibold text-slate-900 mb-1">
+              Drop Document to Sanitize Offline
             </h3>
-            <p className="text-xs text-slate-600 mb-4 max-w-sm mx-auto">
-              Drop your .txt, .csv, .xlsx, .json, .docx, .pdf, or .eml file to sanitize locally with zero network requests.
+            <p className="text-xs text-slate-500 mb-4">
+              All files are parsed locally inside your browser with 0 bytes transmitted.
             </p>
             <div className="flex flex-wrap justify-center gap-1.5">
               {['.txt', '.csv', '.xlsx', '.json', '.xml', '.docx', '.pdf', '.eml'].map((ext) => (
-                <span key={ext} className="px-2 py-0.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs font-mono font-bold">
+                <span key={ext} className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700 text-xs font-mono font-medium">
                   {ext}
                 </span>
               ))}
@@ -511,67 +543,296 @@ export default function App() {
         setActiveTab={setActiveTab}
         workerStatus={workerStatus}
         onOpenInputHub={() => setIsInputHubOpen(true)}
+        onOpenDrawer={() => setIsDrawerOpen(true)}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4">
         {activeTab === 'promptlog' ? (
           <PromptLogTab />
         ) : (
-          <>
-            <CommandStrip
-              result={sanitizedResult}
-              selectedCategory={selectedCategory}
-              currentEntityIndex={currentEntityIndex}
-              onSelectCategory={(cat) => {
-                if (!cat) {
-                  setSelectedCategory(null);
-                  setCurrentEntityIndex(0);
-                } else if (selectedCategory === cat) {
-                  const catMatches = (sanitizedResult?.matches || []).filter(m => m.type === cat && !whitelistedIds.has(m.id));
-                  if (catMatches.length > 0) {
-                    setCurrentEntityIndex((prev) => (prev + 1) % catMatches.length);
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
+              <div className="inline-flex p-1 bg-slate-200/70 rounded-xl">
+                <button
+                  onClick={() => setAppMode('sanitizer')}
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    appMode === 'sanitizer'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <FileText className="w-4 h-4 text-slate-700" />
+                  <span>Document & File Sanitizer</span>
+                </button>
+                <button
+                  onClick={() => setAppMode('message_guard')}
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    appMode === 'message_guard'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Shield className="w-4 h-4 text-slate-700" />
+                  <span>Message Safety Guard</span>
+                </button>
+              </div>
+
+              {appMode === 'sanitizer' && hasSanitizerContent && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsInputHubOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add File</span>
+                  </button>
+                  <button
+                    onClick={handleClearInput}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-rose-600 bg-white hover:bg-rose-50 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Clear All</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {appMode === 'message_guard' ? (
+              <MessageGuardView
+                messageText={messageGuardText}
+                onChangeMessageText={setMessageGuardText}
+                sanitizedResult={messageGuardResult}
+                redactionMode={redactionMode}
+                onChangeRedactionMode={setRedactionMode}
+                onPasteClipboard={async () => {
+                  try {
+                    const text = await navigator.clipboard.readText();
+                    setMessageGuardText(text);
+                    addToast('Pasted message from clipboard');
+                  } catch (e) {
+                    addToast('Clipboard access denied', 'error');
                   }
-                } else {
-                  setSelectedCategory(cat);
-                  setCurrentEntityIndex(0);
-                }
-              }}
-              onOpenDrawer={() => setIsDrawerOpen(true)}
-              activeDetectorCount={enabledTypes.size}
-            />
+                }}
+                onClearMessage={() => {
+                  setMessageGuardText('');
+                  setMessageGuardResult(null);
+                }}
+                addToast={addToast}
+              />
+            ) : (
+              <>
+                {!hasSanitizerContent ? (
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-base font-semibold text-slate-900">
+                          Sanitize Sensitive Data Locally
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Paste text, logs, or drop multi-format files to detect, redact, and pseudonymize PII offline.
+                        </p>
+                      </div>
 
-            <DiffWorkspace
-              rawText={rawText}
-              onChangeRawText={setRawText}
-              sanitizedText={sanitizedResult?.sanitized_text || rawText}
-              matches={sanitizedResult?.matches || []}
-              activeFile={activeFile}
-              activeFormat={activeFormat}
-              whitelistedIds={whitelistedIds}
-              onToggleWhitelist={handleToggleWhitelist}
-              highlightedCategory={selectedCategory}
-              currentEntityIndex={currentEntityIndex}
-              onCopySanitized={handleCopySanitized}
-              isCopied={isCopied}
-              tableMatrix={activeFile?.tableMatrix}
-              redactionMode={redactionMode}
-              onChangeRedactionMode={setRedactionMode}
-              onOpenInputHub={() => setIsInputHubOpen(true)}
-              onPasteClipboard={handlePasteClipboard}
-              onClearInput={handleClearInput}
-            />
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowDemoDropdown(!showDemoDropdown)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Load Demo Sample</span>
+                          <ChevronDown className="w-3 h-3 text-slate-400" />
+                        </button>
 
-            <ExportBar
-              onDownloadSanitized={handleDownloadSanitized}
-              onDownloadAuditReport={handleDownloadAuditReport}
-              onDownloadVault={handleDownloadVault}
-              redactionMode={redactionMode}
-              activeFormat={activeFormat}
-              rawHash={liveRawHash || sanitizedResult?.raw_sha256}
-              sanitizedHash={liveSanitizedHash || sanitizedResult?.sanitized_sha256}
-              activeMatchesCount={sanitizedResult?.active_matches_count || 0}
-            />
-          </>
+                        {showDemoDropdown && (
+                          <div className="absolute right-0 mt-1.5 w-60 bg-white rounded-xl border border-slate-200 shadow-lg py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
+                            <button
+                              onClick={() => {
+                                setShowDemoDropdown(false);
+                                handleLoadSample('incident');
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-slate-400" />
+                              <div>
+                                <div className="font-medium text-slate-900">Incident Dossier (.txt)</div>
+                                <div className="text-[10px] text-slate-400">Cards, Aadhaar, PAN, secrets & traps</div>
+                              </div>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowDemoDropdown(false);
+                                handleLoadSample('json');
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                            >
+                              <FileCode className="w-3.5 h-3.5 text-slate-400" />
+                              <div>
+                                <div className="font-medium text-slate-900">Security Event Log (.json)</div>
+                                <div className="text-[10px] text-slate-400">Structured JSON payload with tokens</div>
+                              </div>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowDemoDropdown(false);
+                                handleLoadSample('csv');
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                            >
+                              <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
+                              <div>
+                                <div className="font-medium text-slate-900">Customer Support Table (.csv)</div>
+                                <div className="text-[10px] text-slate-400">Tabular ledger with phone & email</div>
+                              </div>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 min-h-[440px]">
+                      <div className="p-6 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs font-semibold text-slate-700">Paste Text or Logs</label>
+                            <button
+                              onClick={handlePasteClipboard}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <ClipboardPaste className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Paste from Clipboard</span>
+                            </button>
+                          </div>
+                          <textarea
+                            value={rawText}
+                            onChange={(e) => setRawText(e.target.value)}
+                            placeholder="Paste text, a message, logs, or notes here to sanitize locally..."
+                            className="w-full h-64 p-3.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-slate-900 focus:bg-white resize-none font-mono leading-relaxed"
+                            spellCheck={false}
+                          />
+                        </div>
+
+                        <div className="mt-4 flex items-center justify-between">
+                          <span className="text-xs text-slate-400">
+                            Strict 0-server privacy • Evaluated in local browser Web Worker
+                          </span>
+                          <button
+                            onClick={() => {
+                              if (!rawText.trim()) {
+                                addToast('Please paste or type text first', 'info');
+                                return;
+                              }
+                              setBatchFiles([{
+                                id: `input_${Date.now()}`,
+                                name: 'manual_input.txt',
+                                size: rawText.length,
+                                format: 'txt',
+                                rawText
+                              }]);
+                              setActiveBatchIndex(0);
+                            }}
+                            disabled={!rawText.trim()}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg shadow-xs transition-colors cursor-pointer"
+                          >
+                            <span>Start Sanitizing</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="p-6 flex flex-col justify-between bg-slate-50/30">
+                        <div>
+                          <div className="mb-2">
+                            <span className="text-xs font-semibold text-slate-700">Drop Files or Spreadsheets</span>
+                          </div>
+                          <div
+                            onClick={() => fileInputRef.current?.click()}
+                            className="border-2 border-dashed border-slate-300 hover:border-slate-400 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-white hover:bg-slate-50/50 min-h-[256px]"
+                          >
+                            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 mb-3 shadow-2xs">
+                              <UploadCloud className="w-6 h-6" />
+                            </div>
+                            <p className="text-sm font-semibold text-slate-900">
+                              Drop files here or click to browse
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1 max-w-xs">
+                              Upload documents, spreadsheets, logs, or multi-file batches for structure-preserving offline redaction.
+                            </p>
+                            <div className="flex flex-wrap justify-center gap-1.5 mt-4 max-w-sm">
+                              {['.txt', '.csv', '.xlsx', '.json', '.xml', '.docx', '.pdf', '.eml'].map((ext) => (
+                                <span key={ext} className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-600 text-[11px] font-mono font-medium">
+                                  {ext}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
+                          <span>Batch files processed sequentially</span>
+                          <span>Exports preserve original file types</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <CommandStrip
+                      result={sanitizedResult}
+                      selectedCategory={selectedCategory}
+                      currentEntityIndex={currentEntityIndex}
+                      onSelectCategory={(cat) => {
+                        if (!cat) {
+                          setSelectedCategory(null);
+                          setCurrentEntityIndex(0);
+                        } else if (selectedCategory === cat) {
+                          const catMatches = (sanitizedResult?.matches || []).filter(m => m.type === cat && !whitelistedIds.has(m.id));
+                          if (catMatches.length > 0) {
+                            setCurrentEntityIndex((prev) => (prev + 1) % catMatches.length);
+                          }
+                        } else {
+                          setSelectedCategory(cat);
+                          setCurrentEntityIndex(0);
+                        }
+                      }}
+                      onOpenDrawer={() => setIsDrawerOpen(true)}
+                      activeDetectorCount={enabledTypes.size}
+                    />
+
+                    <DiffWorkspace
+                      rawText={rawText}
+                      onChangeRawText={setRawText}
+                      sanitizedText={sanitizedResult?.sanitized_text || rawText}
+                      matches={sanitizedResult?.matches || []}
+                      activeFile={activeFile}
+                      activeFormat={activeFormat}
+                      whitelistedIds={whitelistedIds}
+                      onToggleWhitelist={handleToggleWhitelist}
+                      highlightedCategory={selectedCategory}
+                      currentEntityIndex={currentEntityIndex}
+                      onCopySanitized={handleCopySanitized}
+                      isCopied={isCopied}
+                      tableMatrix={activeFile?.tableMatrix}
+                      redactionMode={redactionMode}
+                      onChangeRedactionMode={setRedactionMode}
+                      onOpenInputHub={() => setIsInputHubOpen(true)}
+                      onPasteClipboard={handlePasteClipboard}
+                      onClearInput={handleClearInput}
+                    />
+
+                    <ExportBar
+                      onDownloadSanitized={handleDownloadSanitized}
+                      onDownloadAuditReport={handleDownloadAuditReport}
+                      onDownloadVault={handleDownloadVault}
+                      redactionMode={redactionMode}
+                      activeFormat={activeFormat}
+                      rawHash={liveRawHash || sanitizedResult?.raw_sha256}
+                      sanitizedHash={liveSanitizedHash || sanitizedResult?.sanitized_sha256}
+                      activeMatchesCount={sanitizedResult?.active_matches_count || 0}
+                    />
+                  </>
+                )}
+              </>
+            )}
+          </div>
         )}
       </main>
 

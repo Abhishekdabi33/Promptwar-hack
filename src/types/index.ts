@@ -8,7 +8,29 @@ export type EntityCategory =
   | 'Phone'
   | 'IPv4'
   | 'Secret Token'
+  | 'OTP'
+  | 'Password'
+  | 'Financial'
+  | 'Suspicious Link'
   | 'Custom';
+
+export type AppMode = 'sanitizer' | 'message_guard';
+
+export interface SafetyAdvisory {
+  id: string;
+  category: string;
+  title: string;
+  description: string;
+  recommendation: string;
+  severity: 'Critical' | 'High' | 'Medium';
+}
+
+export interface SafetyVerdict {
+  level: 'Safe to Send' | 'Review Recommended' | 'Unsafe to Send';
+  color: 'emerald' | 'amber' | 'rose';
+  advisories: SafetyAdvisory[];
+  risksCount: number;
+}
 
 export type SeverityTier = 'Low' | 'Medium' | 'High' | 'Critical';
 

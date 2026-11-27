@@ -87,14 +87,42 @@ export default function DetectorDrawer({
       label: 'High-Entropy Secrets & Keys',
       desc: 'Shannon entropy analysis (>= 3.2 bits/char) & bearer tokens',
       icon: KeyRound,
-      color: 'text-orange-600 bg-orange-50 border-orange-200'
+      color: 'text-rose-600 bg-rose-50 border-rose-200'
+    },
+    {
+      key: 'OTP',
+      label: 'One-Time Passcodes & PINs',
+      desc: '4-8 digit security verification codes and PINs',
+      icon: KeyRound,
+      color: 'text-rose-600 bg-rose-50 border-rose-200'
+    },
+    {
+      key: 'Password',
+      label: 'Plaintext Passwords',
+      desc: 'Contextual credential assignments (password=, pwd:, passcode:)',
+      icon: KeyRound,
+      color: 'text-rose-600 bg-rose-50 border-rose-200'
+    },
+    {
+      key: 'Financial',
+      label: 'UPI IDs & IFSC Codes',
+      desc: 'Indian bank branch routing codes and UPI handles',
+      icon: CreditCard,
+      color: 'text-amber-600 bg-amber-50 border-amber-200'
+    },
+    {
+      key: 'Suspicious Link',
+      label: 'Shortened & Direct-IP Links',
+      desc: 'bit.ly, tinyurl, raw IP addresses, and unencrypted login links',
+      icon: Network,
+      color: 'text-amber-600 bg-amber-50 border-amber-200'
     },
     {
       key: 'Custom',
       label: 'Custom Rules & Terms',
       desc: 'User-specified exact keywords and regular expressions',
       icon: Sparkles,
-      color: 'text-teal-600 bg-teal-50 border-teal-200'
+      color: 'text-slate-600 bg-slate-50 border-slate-200'
     }
   ];
 

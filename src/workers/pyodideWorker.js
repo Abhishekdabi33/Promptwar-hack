@@ -116,6 +116,10 @@ function jsFormatFullMask(etype) {
     'Secret Token': '[REDACTED_SECRET]',
     'IPv4': '[REDACTED_IPV4]',
     'Phone': '[REDACTED_PHONE]',
+    'OTP': '[REDACTED_OTP]',
+    'Password': '[REDACTED_PASSWORD]',
+    'Financial': '[REDACTED_FINANCIAL]',
+    'Suspicious Link': '[REDACTED_LINK]',
     'Custom': '[REDACTED_CUSTOM]'
   };
   return m[etype] || '[REDACTED]';
@@ -123,6 +127,22 @@ function jsFormatFullMask(etype) {
 
 function jsFormatPartialMask(etype, val) {
   const v = String(val).trim();
+  if (etype === 'OTP') {
+    return '******';
+  }
+  if (etype === 'Password') {
+    return '********';
+  }
+  if (etype === 'Financial') {
+    if (v.includes('@')) {
+      const parts = v.split('@');
+      return `****@${parts[parts.length - 1]}`;
+    }
+    return `${v.slice(0, 4)}****`;
+  }
+  if (etype === 'Suspicious Link') {
+    return '[LINK_HIDDEN]';
+  }
   if (etype === 'Credit Card') {
     const digits = v.replace(/[\s-]/g, '');
     const l4 = digits.slice(-4);
@@ -178,6 +198,10 @@ function jsGetPseudonym(etype, val, pmap, counters) {
     'Secret Token': 'SECRET',
     'IPv4': 'IPV4',
     'Phone': 'PHONE',
+    'OTP': 'OTP',
+    'Password': 'PWD',
+    'Financial': 'FIN',
+    'Suspicious Link': 'LINK',
     'Custom': 'USER'
   };
   const prefix = pmapPrefix[etype] || 'TOKEN';
@@ -190,7 +214,8 @@ function jsGetPseudonym(etype, val, pmap, counters) {
 function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
   const redactionMode = options.redaction_mode || 'full';
   const enabled = new Set(options.enabled_types || [
-    'Credit Card', 'Aadhaar', 'PAN', 'Email', 'Phone', 'IPv4', 'Secret Token', 'Custom'
+    'Credit Card', 'Aadhaar', 'PAN', 'Email', 'Phone', 'IPv4', 'Secret Token',
+    'OTP', 'Password', 'Financial', 'Suspicious Link', 'Custom'
   ]);
   const customRules = options.custom_rules || [];
   const whitelisted = new Set(options.whitelisted_ids || []);
@@ -365,6 +390,101 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
     }
   }
 
+  if (enabled.has('OTP')) {
+    const pat = /(?:otp|one[\s-]*time[\s-]*password|verification[\s-]*code|security[\s-]*code|cvv|pin)(?:[\s:=]+|[\s]+is[\s:=]+)([0-9]{4,8})\b/gi;
+    let m;
+    while ((m = pat.exec(text)) !== null) {
+      const matchIdx = m.index + m[0].lastIndexOf(m[1]);
+      candidates.push({
+        start: matchIdx,
+        end: matchIdx + m[1].length,
+        type: 'OTP',
+        value: m[1],
+        reason: 'One-Time Security Verification Code / PIN',
+        severity: 'Critical'
+      });
+    }
+  }
+
+  if (enabled.has('Password')) {
+    const pat = /\b(?:password|passwd|pwd|passcode|secret_key)(?:[\s:=]+|[\s]+is[\s:=]+)([^\s,;!'"\n]{4,64})/gi;
+    let m;
+    while ((m = pat.exec(text)) !== null) {
+      const matchIdx = m.index + m[0].lastIndexOf(m[1]);
+      candidates.push({
+        start: matchIdx,
+        end: matchIdx + m[1].length,
+        type: 'Password',
+        value: m[1],
+        reason: 'Plaintext Credential / Password Assignment',
+        severity: 'Critical'
+      });
+    }
+  }
+
+  if (enabled.has('Financial')) {
+    const upiPat = /\b[a-zA-Z0-9.\-_]{2,64}@(okaxis|okhdfcbank|okicici|oksbi|paytm|ybl|ibl|axl|upi|gpay|apl|postbank|jupiteraxis)\b/gi;
+    let m;
+    while ((m = upiPat.exec(text)) !== null) {
+      candidates.push({
+        start: m.index,
+        end: m.index + m[0].length,
+        type: 'Financial',
+        value: m[0],
+        reason: 'Indian UPI Virtual Payment Address (VPA)',
+        severity: 'High'
+      });
+    }
+    const ifscPat = /\b[A-Z]{4}0[A-Z0-9]{6}\b/g;
+    while ((m = ifscPat.exec(text)) !== null) {
+      candidates.push({
+        start: m.index,
+        end: m.index + m[0].length,
+        type: 'Financial',
+        value: m[0],
+        reason: 'Indian Financial System Code (IFSC)',
+        severity: 'High'
+      });
+    }
+  }
+
+  if (enabled.has('Suspicious Link')) {
+    const shortPat = /\b(?:https?:\/\/)?(?:bit\.ly|tinyurl\.com|t\.co|goo\.gl|is\.gd|buff\.ly|ow\.ly|cutt\.ly|rb\.gy)\/[A-Za-z0-9_-]+\b/gi;
+    let m;
+    while ((m = shortPat.exec(text)) !== null) {
+      candidates.push({
+        start: m.index,
+        end: m.index + m[0].length,
+        type: 'Suspicious Link',
+        value: m[0],
+        reason: 'Shortened URL (Obfuscated Target Destination)',
+        severity: 'High'
+      });
+    }
+    const ipUrlPat = /\bhttps?:\/\/(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?(?:\/[^\s]*)?\b/g;
+    while ((m = ipUrlPat.exec(text)) !== null) {
+      candidates.push({
+        start: m.index,
+        end: m.index + m[0].length,
+        type: 'Suspicious Link',
+        value: m[0],
+        reason: 'Direct IP URL (Circumvents Domain Reputation)',
+        severity: 'High'
+      });
+    }
+    const insecurePat = /\bhttp:\/\/[^\s]+(?:login|signin|account|bank|verify|auth|pay)[^\s]*\b/gi;
+    while ((m = insecurePat.exec(text)) !== null) {
+      candidates.push({
+        start: m.index,
+        end: m.index + m[0].length,
+        type: 'Suspicious Link',
+        value: m[0],
+        reason: 'Unencrypted HTTP Authentication / Payment Link',
+        severity: 'High'
+      });
+    }
+  }
+
   if (enabled.has('Custom')) {
     for (const rule of customRules) {
       const rtype = rule.type || 'keyword';
@@ -388,10 +508,14 @@ function fallbackProcessText(text, options = {}, pmap = {}, counters = {}) {
   }
 
   const priority = {
+    'Password': 110,
+    'OTP': 105,
     'Credit Card': 100,
     'Aadhaar': 90,
     'PAN': 80,
+    'Financial': 75,
     'Secret Token': 70,
+    'Suspicious Link': 65,
     'Email': 60,
     'IPv4': 50,
     'Phone': 40,
