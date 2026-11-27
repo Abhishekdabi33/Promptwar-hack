@@ -1,9 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Table, Download, ArrowUpDown } from 'lucide-react';
 
-export default function TablePreview({ matrix = [], onExportCsv }) {
+interface TablePreviewProps {
+  matrix: string[][];
+  onExportCsv?: () => void;
+}
+
+export default function TablePreview({ matrix = [], onExportCsv }: TablePreviewProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortCol, setSortCol] = useState(null);
+  const [sortCol, setSortCol] = useState<number | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
 
   const headers = matrix.length > 0 ? matrix[0] : [];
@@ -25,7 +30,7 @@ export default function TablePreview({ matrix = [], onExportCsv }) {
     return result;
   }, [rows, searchTerm, sortCol, sortAsc]);
 
-  const handleSort = (colIdx) => {
+  const handleSort = (colIdx: number) => {
     if (sortCol === colIdx) {
       setSortAsc(!sortAsc);
     } else {

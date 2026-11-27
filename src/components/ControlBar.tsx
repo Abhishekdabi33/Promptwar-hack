@@ -5,10 +5,19 @@ import {
   Shuffle, 
   Plus, 
   X, 
-  SlidersHorizontal,
-  Flame,
   Binary
 } from 'lucide-react';
+import { RedactionMode, CustomRule } from '../types';
+
+interface ControlBarProps {
+  redactionMode: RedactionMode;
+  onChangeRedactionMode: (mode: RedactionMode) => void;
+  enabledTypes: Set<string>;
+  onToggleType: (type: string) => void;
+  customRules: CustomRule[];
+  onAddCustomRule: (rule: CustomRule) => void;
+  onRemoveCustomRule: (id: string) => void;
+}
 
 export default function ControlBar({
   redactionMode,
@@ -18,11 +27,16 @@ export default function ControlBar({
   customRules,
   onAddCustomRule,
   onRemoveCustomRule
-}) {
+}: ControlBarProps) {
   const [ruleInput, setRuleInput] = useState('');
-  const [ruleType, setRuleType] = useState('keyword');
+  const [ruleType, setRuleType] = useState<'keyword' | 'regex'>('keyword');
 
-  const modes = [
+  const modes: Array<{
+    id: RedactionMode;
+    label: string;
+    desc: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }> = [
     {
       id: 'full',
       label: 'Full Mask',
@@ -54,7 +68,7 @@ export default function ControlBar({
     { key: 'Custom', label: 'Custom Rules' }
   ];
 
-  const handleAddRule = (e) => {
+  const handleAddRule = (e: React.FormEvent) => {
     e.preventDefault();
     if (!ruleInput.trim()) return;
     onAddCustomRule({
@@ -127,7 +141,7 @@ export default function ControlBar({
         <form onSubmit={handleAddRule} className="flex items-center gap-2 flex-1 max-w-md">
           <select
             value={ruleType}
-            onChange={(e) => setRuleType(e.target.value)}
+            onChange={(e) => setRuleType(e.target.value as 'keyword' | 'regex')}
             className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 font-medium focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
           >
             <option value="keyword">Keyword</option>

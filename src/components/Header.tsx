@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { 
   ShieldCheck, 
-  Terminal, 
   Cpu, 
   ClipboardPaste, 
   FolderUp, 
@@ -10,9 +9,20 @@ import {
   Database, 
   Table2, 
   Lock,
-  Layers,
   Sparkles
 } from 'lucide-react';
+import { TabType, WorkerStatus } from '../types';
+
+interface HeaderProps {
+  activeTab: TabType;
+  setActiveTab: (tab: TabType) => void;
+  workerStatus: WorkerStatus;
+  onLoadSample: (sampleType: string) => void;
+  onPasteClipboard: () => void;
+  onTriggerUpload: () => void;
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
 
 export default function Header({
   activeTab,
@@ -23,9 +33,9 @@ export default function Header({
   onTriggerUpload,
   fileInputRef,
   onFileChange
-}) {
+}: HeaderProps) {
   const [sampleMenuOpen, setSampleMenuOpen] = useState(false);
-  const menuRef = useRef(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const getStatusBadge = () => {
     if (workerStatus.status === 'ready' || workerStatus.status === 'ready_fallback') {

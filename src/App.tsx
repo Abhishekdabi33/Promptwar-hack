@@ -27,37 +27,47 @@ import {
   createBatchZip 
 } from './utils/fileHandlers';
 import { UploadCloud } from 'lucide-react';
+import { 
+  WorkerStatus, 
+  TabType, 
+  RedactionMode, 
+  CustomRule, 
+  BatchFile, 
+  SanitizationResult, 
+  ToastItem, 
+  EntityCategory 
+} from './types';
 
 export default function App() {
-  const [workerStatus, setWorkerStatus] = useState({
+  const [workerStatus, setWorkerStatus] = useState<WorkerStatus>({
     status: 'booting',
     engine: 'initializing',
     message: 'Booting Python WASM Worker...'
   });
-  const [activeTab, setActiveTab] = useState('studio');
+  const [activeTab, setActiveTab] = useState<TabType>('studio');
   const [rawText, setRawText] = useState('');
-  const [sanitizedResult, setSanitizedResult] = useState(null);
-  const [redactionMode, setRedactionMode] = useState('full');
-  const [enabledTypes, setEnabledTypes] = useState(new Set([
+  const [sanitizedResult, setSanitizedResult] = useState<SanitizationResult | null>(null);
+  const [redactionMode, setRedactionMode] = useState<RedactionMode>('full');
+  const [enabledTypes, setEnabledTypes] = useState<Set<string>>(new Set([
     'Credit Card', 'Aadhaar', 'PAN', 'Email', 'Phone', 'IPv4', 'Secret Token', 'Custom'
   ]));
-  const [customRules, setCustomRules] = useState([]);
-  const [whitelistedIds, setWhitelistedIds] = useState(new Set());
-  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [customRules, setCustomRules] = useState<CustomRule[]>([]);
+  const [whitelistedIds, setWhitelistedIds] = useState<Set<string>>(new Set());
+  const [selectedCategory, setSelectedCategory] = useState<EntityCategory | null>(null);
   const [currentEntityIndex, setCurrentEntityIndex] = useState(0);
 
-  const [batchFiles, setBatchFiles] = useState([]);
+  const [batchFiles, setBatchFiles] = useState<BatchFile[]>([]);
   const [activeBatchIndex, setActiveBatchIndex] = useState(0);
   const [isCopied, setIsCopied] = useState(false);
-  const [toasts, setToasts] = useState([]);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
-  const sharedPseudonymMapRef = useRef({});
-  const sharedCountersRef = useRef({});
-  const fileInputRef = useRef(null);
-  const processTimeoutRef = useRef(null);
+  const sharedPseudonymMapRef = useRef<Record<string, string>>({});
+  const sharedCountersRef = useRef<Record<string, number>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const processTimeoutRef = useRef<any>(null);
 
-  const addToast = (message, type = 'success') => {
+  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = `toast_${Date.now()}_${Math.random()}`;
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
@@ -65,7 +75,7 @@ export default function App() {
     }, 3500);
   };
 
-  const removeToast = (id) => {
+  const removeToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
@@ -101,7 +111,7 @@ export default function App() {
   const activeFile = batchFiles[activeBatchIndex] || null;
   const activeFormat = activeFile?.format || 'text';
 
-  const runSanitization = useCallback(async (textToProcess) => {
+  const runSanitization = useCallback(async (textToProcess: string) => {
     if (!textToProcess) {
       setSanitizedResult(null);
       return;
@@ -140,7 +150,7 @@ export default function App() {
     return () => clearTimeout(processTimeoutRef.current);
   }, [rawText, runSanitization]);
 
-  const handleLoadSample = async (sampleType) => {
+  const handleLoadSample = async (sampleType: string) => {
     try {
       const sample = await generateSampleWithWorker(sampleType);
       const ext = sampleType === 'json' ? 'json' : sampleType === 'csv' ? 'csv' : 'txt';
@@ -151,7 +161,7 @@ export default function App() {
       setSelectedCategory(null);
       setCurrentEntityIndex(0);
 
-      const newFile = {
+      const newFile: BatchFile = {
         id: `sample_${Date.now()}`,
         name,
         size: sample.length,
@@ -175,7 +185,7 @@ export default function App() {
         return;
       }
       setRawText(clipText);
-      const newFile = {
+      const newFile: BatchFile = {
         id: `clip_${Date.now()}`,
         name: 'clipboard_snippet.txt',
         size: clipText.length,
@@ -192,10 +202,10 @@ export default function App() {
     }
   };
 
-  const handleProcessIncomingFiles = async (filesList) => {
+  const handleProcessIncomingFiles = async (filesList: FileList | File[] | null) => {
     if (!filesList || filesList.length === 0) return;
 
-    const newBatch = [];
+    const newBatch: BatchFile[] = [];
     for (let i = 0; i < filesList.length; i++) {
       const file = filesList[i];
       const fmt = detectFormat(file.name);
@@ -245,7 +255,7 @@ export default function App() {
             result: res
           });
         } else if (fmt === 'xlsx') {
-          const { workbook, sheets, sheetNames } = await parseXlsxWorkbook(file);
+          const { sheets, sheetNames } = await parseXlsxWorkbook(file);
           const firstSheet = sheets[sheetNames[0]] || [];
           const cellOptions = {
             redaction_mode: redactionMode,
@@ -273,7 +283,7 @@ export default function App() {
             sanitizedBlob: sanitizedXlsxBlob,
             sanitizedFilename: `sanitized_${file.name}`,
             tableMatrix: cellRes.sanitized_matrix,
-            result: cellRes
+            result: cellRes as any
           });
         } else {
           const text = await file.text();
@@ -285,8 +295,8 @@ export default function App() {
             rawText: text
           });
         }
-      } catch (e) {
-        addToast(`Failed to parse ${file.name}: ${e.message}`, 'error');
+      } catch (e: any) {
+        addToast(`Failed to parse ${file.name}: ${e?.message || 'Error'}`, 'error');
       }
     }
 
@@ -301,7 +311,7 @@ export default function App() {
     }
   };
 
-  const handleSelectBatchFile = (index) => {
+  const handleSelectBatchFile = (index: number) => {
     setActiveBatchIndex(index);
     const target = batchFiles[index];
     if (target) {
@@ -312,7 +322,7 @@ export default function App() {
     }
   };
 
-  const handleRemoveBatchFile = (index) => {
+  const handleRemoveBatchFile = (index: number) => {
     const nextFiles = batchFiles.filter((_, i) => i !== index);
     setBatchFiles(nextFiles);
     if (nextFiles.length > 0) {
@@ -325,7 +335,7 @@ export default function App() {
     }
   };
 
-  const handleToggleType = (type) => {
+  const handleToggleType = (type: string) => {
     setEnabledTypes(prev => {
       const next = new Set(prev);
       if (next.has(type)) next.delete(type);
@@ -334,16 +344,16 @@ export default function App() {
     });
   };
 
-  const handleAddCustomRule = (rule) => {
+  const handleAddCustomRule = (rule: CustomRule) => {
     setCustomRules(prev => [...prev, rule]);
     addToast(`Added custom ${rule.type} rule: "${rule.value}"`);
   };
 
-  const handleRemoveCustomRule = (id) => {
+  const handleRemoveCustomRule = (id: string) => {
     setCustomRules(prev => prev.filter(r => r.id !== id));
   };
 
-  const handleToggleWhitelist = (matchId) => {
+  const handleToggleWhitelist = (matchId: string) => {
     setWhitelistedIds(prev => {
       const next = new Set(prev);
       const isAlreadyWhite = next.has(matchId);
@@ -372,7 +382,7 @@ export default function App() {
     return true;
   });
 
-  const handleNavigateEntity = (direction) => {
+  const handleNavigateEntity = (direction: 'prev' | 'next') => {
     if (filteredMatches.length === 0) return;
     if (direction === 'next') {
       setCurrentEntityIndex(prev => (prev + 1) % filteredMatches.length);
@@ -482,17 +492,17 @@ export default function App() {
     }
   };
 
-  const handleDragOver = (e) => {
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
-  const handleDragLeave = (e) => {
+  const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
   };
 
-  const handleDrop = (e) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {

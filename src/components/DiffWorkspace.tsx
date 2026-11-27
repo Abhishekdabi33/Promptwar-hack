@@ -6,14 +6,27 @@ import {
   Eye, 
   FileText, 
   Table2, 
-  ShieldCheck, 
-  ShieldX, 
-  SlidersHorizontal,
-  ExternalLink,
-  Info
+  ShieldCheck
 } from 'lucide-react';
 import TablePreview from './TablePreview';
 import { parseDelimitedTextToMatrix } from '../utils/fileHandlers';
+import { PIIMatch, BatchFile, EntityCategory } from '../types';
+
+interface DiffWorkspaceProps {
+  rawText: string;
+  onChangeRawText: (text: string) => void;
+  sanitizedText: string;
+  matches: PIIMatch[];
+  activeFile: BatchFile | null;
+  activeFormat: string;
+  whitelistedIds: Set<string>;
+  onToggleWhitelist: (id: string) => void;
+  highlightedCategory: EntityCategory | null;
+  currentEntityIndex: number;
+  onCopySanitized: () => void;
+  isCopied: boolean;
+  tableMatrix?: string[][];
+}
 
 export default function DiffWorkspace({
   rawText,
@@ -29,16 +42,16 @@ export default function DiffWorkspace({
   onCopySanitized,
   isCopied,
   tableMatrix
-}) {
-  const [viewMode, setViewMode] = useState('inspect');
+}: DiffWorkspaceProps) {
+  const [viewMode, setViewMode] = useState<'edit' | 'inspect'>('inspect');
   const [showTablePreview, setShowTablePreview] = useState(false);
-  const [selectedMatch, setSelectedMatch] = useState(null);
-  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
+  const [selectedMatch, setSelectedMatch] = useState<PIIMatch | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
-  const leftPaneRef = useRef(null);
-  const rightPaneRef = useRef(null);
-  const isScrollingRef = useRef(null);
-  const scrollTimeoutRef = useRef(null);
+  const leftPaneRef = useRef<HTMLDivElement>(null);
+  const rightPaneRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef<'left' | 'right' | null>(null);
+  const scrollTimeoutRef = useRef<any>(null);
 
   const rawLines = useMemo(() => rawText.split('\n'), [rawText]);
   const sanitizedLines = useMemo(() => sanitizedText.split('\n'), [sanitizedText]);
@@ -78,7 +91,7 @@ export default function DiffWorkspace({
     }, 50);
   };
 
-  const scrollToLine = (lineNum) => {
+  const scrollToLine = (lineNum: number) => {
     const targetIdx = Math.max(0, lineNum - 1);
     const approxLineHeight = 22;
     const targetScroll = targetIdx * approxLineHeight - 80;
@@ -102,7 +115,7 @@ export default function DiffWorkspace({
     }
   }, [highlightedCategory, currentEntityIndex]);
 
-  const getPillColor = (type, isWhitelisted = false) => {
+  const getPillColor = (type: EntityCategory, isWhitelisted = false) => {
     if (isWhitelisted) {
       return 'bg-slate-200/80 text-slate-500 line-through border border-slate-300';
     }
@@ -119,7 +132,7 @@ export default function DiffWorkspace({
     }
   };
 
-  const getDotColor = (type) => {
+  const getDotColor = (type: EntityCategory) => {
     switch (type) {
       case 'Credit Card': return '#E11D48';
       case 'Aadhaar': return '#4F46E5';
@@ -133,9 +146,9 @@ export default function DiffWorkspace({
     }
   };
 
-  const openMatchPopover = (match, e) => {
+  const openMatchPopover = (match: PIIMatch, e: React.MouseEvent) => {
     e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setPopoverPos({
       top: rect.bottom + window.scrollY + 8,
       left: Math.min(window.innerWidth - 320, Math.max(20, rect.left + window.scrollX - 100))
@@ -152,7 +165,7 @@ export default function DiffWorkspace({
       );
     }
 
-    const segments = [];
+    const segments: React.ReactNode[] = [];
     let lastIdx = 0;
     const sorted = [...matches].sort((a, b) => a.start - b.start);
 

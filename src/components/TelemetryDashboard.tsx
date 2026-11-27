@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  ShieldAlert, 
   ShieldCheck, 
-  AlertTriangle, 
   CheckCircle2, 
   ChevronLeft, 
   ChevronRight, 
-  Info, 
   X,
   CreditCard,
   Fingerprint,
@@ -18,6 +15,16 @@ import {
   KeyRound,
   Sparkles
 } from 'lucide-react';
+import { SanitizationResult, EntityCategory, PIIMatch } from '../types';
+
+interface TelemetryDashboardProps {
+  result: SanitizationResult | null;
+  selectedCategory: EntityCategory | null;
+  onSelectCategory: (cat: EntityCategory | null) => void;
+  currentEntityIndex: number;
+  onNavigateEntity: (dir: 'prev' | 'next') => void;
+  filteredMatches: PIIMatch[];
+}
 
 export default function TelemetryDashboard({
   result,
@@ -26,7 +33,7 @@ export default function TelemetryDashboard({
   currentEntityIndex,
   onNavigateEntity,
   filteredMatches
-}) {
+}: TelemetryDashboardProps) {
   const [trapModalOpen, setTrapModalOpen] = useState(false);
 
   const riskScore = result?.risk_score ?? 0;
@@ -41,7 +48,7 @@ export default function TelemetryDashboard({
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (riskScore / 100) * circumference;
 
-  const getTierColor = (tier) => {
+  const getTierColor = (tier: string) => {
     switch (tier) {
       case 'Critical': return { stroke: '#E11D48', text: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-200' };
       case 'High': return { stroke: '#EA580C', text: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' };
@@ -52,7 +59,12 @@ export default function TelemetryDashboard({
 
   const tierColors = getTierColor(riskTier);
 
-  const categories = [
+  const categories: Array<{
+    key: EntityCategory;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    color: string;
+  }> = [
     { key: 'Credit Card', label: 'Credit Cards', icon: CreditCard, color: 'border-rose-300 bg-rose-50/70 text-rose-800' },
     { key: 'Aadhaar', label: '12-Digit Aadhaar', icon: Fingerprint, color: 'border-indigo-300 bg-indigo-50/70 text-indigo-800' },
     { key: 'PAN', label: 'Income Tax PAN', icon: FileBadge, color: 'border-purple-300 bg-purple-50/70 text-purple-800' },

@@ -1,5 +1,14 @@
 import React from 'react';
-import { Layers, FileText, CheckCircle, Download, X, Archive } from 'lucide-react';
+import { Layers, FileText, CheckCircle, X, Archive } from 'lucide-react';
+import { BatchFile } from '../types';
+
+interface BatchQueueStripProps {
+  files: BatchFile[];
+  activeFileIndex: number;
+  onSelectFile: (idx: number) => void;
+  onRemoveFile: (idx: number) => void;
+  onDownloadAllZip: () => void;
+}
 
 export default function BatchQueueStrip({
   files = [],
@@ -7,7 +16,7 @@ export default function BatchQueueStrip({
   onSelectFile,
   onRemoveFile,
   onDownloadAllZip
-}) {
+}: BatchQueueStripProps) {
   if (files.length <= 1) return null;
 
   return (

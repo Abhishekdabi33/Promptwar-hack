@@ -5,12 +5,12 @@ import JSZip from 'jszip';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 
-export function getFileExtension(filename) {
+export function getFileExtension(filename: string): string {
   if (!filename || !filename.includes('.')) return 'txt';
-  return filename.split('.').pop().toLowerCase();
+  return filename.split('.').pop()!.toLowerCase();
 }
 
-export function detectFormat(filename) {
+export function detectFormat(filename: string): string {
   const ext = getFileExtension(filename);
   if (['csv', 'tsv'].includes(ext)) return 'csv';
   if (['json'].includes(ext)) return 'json';
@@ -22,21 +22,21 @@ export function detectFormat(filename) {
   return 'text';
 }
 
-export async function extractTextFromPdf(fileOrBuffer) {
+export async function extractTextFromPdf(fileOrBuffer: File | ArrayBuffer): Promise<string> {
   const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
   const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
   const pdfDoc = await loadingTask.promise;
   const numPages = pdfDoc.numPages;
-  const pagesText = [];
+  const pagesText: string[] = [];
 
   for (let pageNum = 1; pageNum <= numPages; pageNum++) {
     const page = await pdfDoc.getPage(pageNum);
     const textContent = await page.getTextContent();
-    const pageLines = [];
+    const pageLines: string[] = [];
     let currentLine = '';
-    let lastY = null;
+    let lastY: number | null = null;
 
-    for (const item of textContent.items) {
+    for (const item of (textContent.items as any[])) {
       if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) {
         if (currentLine.trim()) pageLines.push(currentLine.trim());
         currentLine = '';
@@ -52,7 +52,7 @@ export async function extractTextFromPdf(fileOrBuffer) {
   return pagesText.join('\n\n');
 }
 
-export function exportSanitizedPdf(text, filename = 'sanitized_document.pdf') {
+export function exportSanitizedPdf(text: string, filename = 'sanitized_document.pdf'): void {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'pt',
@@ -84,21 +84,28 @@ export function exportSanitizedPdf(text, filename = 'sanitized_document.pdf') {
   doc.save(filename);
 }
 
-export async function parseXlsxWorkbook(fileOrBuffer) {
+export async function parseXlsxWorkbook(fileOrBuffer: File | ArrayBuffer): Promise<{
+  workbook: XLSX.WorkBook;
+  sheets: Record<string, string[][]>;
+  sheetNames: string[];
+}> {
   const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
   const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-  const sheets = {};
+  const sheets: Record<string, string[][]> = {};
 
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName];
-    const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' }) as string[][];
     sheets[sheetName] = matrix;
   }
 
   return { workbook, sheets, sheetNames: workbook.SheetNames };
 }
 
-export function rebuildXlsxWorkbook(sanitizedSheets, originalSheetNames) {
+export function rebuildXlsxWorkbook(
+  sanitizedSheets: Record<string, string[][]>,
+  originalSheetNames: string[]
+): Blob {
   const newWb = XLSX.utils.book_new();
   for (const name of originalSheetNames) {
     const matrix = sanitizedSheets[name] || [];
@@ -109,7 +116,7 @@ export function rebuildXlsxWorkbook(sanitizedSheets, originalSheetNames) {
   return new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 
-export function arrayBufferToBase64(buffer) {
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
   let binary = '';
   const bytes = new Uint8Array(buffer);
   const len = bytes.byteLength;
@@ -119,7 +126,7 @@ export function arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
-export function base64ToBlob(b64Data, contentType = 'application/octet-stream') {
+export function base64ToBlob(b64Data: string, contentType = 'application/octet-stream'): Blob {
   const byteCharacters = atob(b64Data);
   const byteNumbers = new Array(byteCharacters.length);
   for (let i = 0; i < byteCharacters.length; i++) {
@@ -129,7 +136,7 @@ export function base64ToBlob(b64Data, contentType = 'application/octet-stream') 
   return new Blob([byteArray], { type: contentType });
 }
 
-export function downloadBlob(blob, filename) {
+export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -140,12 +147,14 @@ export function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-export function downloadText(text, filename, mimeType = 'text/plain') {
+export function downloadText(text: string, filename: string, mimeType = 'text/plain'): void {
   const blob = new Blob([text], { type: mimeType });
   downloadBlob(blob, filename);
 }
 
-export async function createBatchZip(files) {
+export async function createBatchZip(
+  files: Array<{ sanitizedFilename: string; sanitizedBlob?: Blob | null; sanitizedText?: string }>
+): Promise<Blob> {
   const zip = new JSZip();
   for (const f of files) {
     if (f.sanitizedBlob) {
@@ -157,9 +166,9 @@ export async function createBatchZip(files) {
   return await zip.generateAsync({ type: 'blob' });
 }
 
-export function parseDelimitedTextToMatrix(text, delimiter = ',') {
-  const rows = [];
-  let currentRow = [];
+export function parseDelimitedTextToMatrix(text: string, delimiter = ','): string[][] {
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
   let currentCell = '';
   let insideQuotes = false;
 

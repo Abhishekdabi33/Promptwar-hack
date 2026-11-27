@@ -3,13 +3,9 @@ import {
   FileTerminal, 
   Copy, 
   Check, 
-  ShieldCheck, 
   Cpu, 
   Binary, 
-  Workflow, 
-  Code2, 
   FileSpreadsheet, 
-  FileText,
   Lock
 } from 'lucide-react';
 

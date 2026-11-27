@@ -1,7 +1,13 @@
 import React from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { ToastItem } from '../types';
 
-export default function Toast({ toasts = [], onDismiss }) {
+interface ToastProps {
+  toasts: ToastItem[];
+  onDismiss: (id: string) => void;
+}
+
+export default function Toast({ toasts = [], onDismiss }: ToastProps) {
   if (toasts.length === 0) return null;
 
   return (

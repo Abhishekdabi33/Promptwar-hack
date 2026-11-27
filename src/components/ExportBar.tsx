@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Download, 
   FileCheck2, 
@@ -6,9 +6,20 @@ import {
   Fingerprint, 
   Copy, 
   ShieldCheck, 
-  Check,
-  FileCode2
+  Check 
 } from 'lucide-react';
+import { RedactionMode } from '../types';
+
+interface ExportBarProps {
+  onDownloadSanitized: () => void;
+  onDownloadAuditReport: () => void;
+  onDownloadVault: () => void;
+  redactionMode: RedactionMode;
+  activeFormat: string;
+  rawHash?: string;
+  sanitizedHash?: string;
+  activeMatchesCount: number;
+}
 
 export default function ExportBar({
   onDownloadSanitized,
@@ -17,12 +28,11 @@ export default function ExportBar({
   redactionMode,
   activeFormat,
   rawHash,
-  sanitizedHash,
-  activeMatchesCount
-}) {
-  const [copiedHash, setCopiedHash] = React.useState(null);
+  sanitizedHash
+}: ExportBarProps) {
+  const [copiedHash, setCopiedHash] = useState<string | null>(null);
 
-  const copyToClipboard = (hash, label) => {
+  const copyToClipboard = (hash: string, label: string) => {
     navigator.clipboard.writeText(hash);
     setCopiedHash(label);
     setTimeout(() => setCopiedHash(null), 2000);
