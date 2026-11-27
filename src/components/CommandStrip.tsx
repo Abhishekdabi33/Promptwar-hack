@@ -22,6 +22,7 @@ interface CommandStripProps {
   onSelectCategory: (cat: EntityCategory | null) => void;
   onOpenDrawer: () => void;
   activeDetectorCount: number;
+  currentEntityIndex?: number;
 }
 
 export default function CommandStrip({
@@ -29,7 +30,8 @@ export default function CommandStrip({
   selectedCategory,
   onSelectCategory,
   onOpenDrawer,
-  activeDetectorCount
+  activeDetectorCount,
+  currentEntityIndex = 0
 }: CommandStripProps) {
   const [trapModalOpen, setTrapModalOpen] = useState(false);
 
@@ -150,28 +152,40 @@ export default function CommandStrip({
               const count = entityCounts[cat.key] || 0;
               const isSelected = selectedCategory === cat.key;
               const Icon = cat.icon;
+              const stepDisplay = isSelected && count > 1 ? `${(currentEntityIndex % count) + 1}/${count}` : `${count}`;
 
               return (
                 <button
                   key={cat.key}
-                  onClick={() => onSelectCategory(isSelected ? null : cat.key)}
+                  onClick={() => onSelectCategory(cat.key)}
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all cursor-pointer whitespace-nowrap shadow-2xs ${
                     isSelected
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs ring-2 ring-indigo-300'
                       : `${cat.color} hover:brightness-95`
                   }`}
-                  title={`Filter & jump to ${cat.label} matches`}
+                  title={isSelected ? `Click to step to next ${cat.label} match` : `Filter & step through ${cat.label} matches`}
                 >
                   <Icon className="w-3.5 h-3.5 flex-shrink-0" />
                   <span>{cat.label}</span>
                   <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
                     isSelected ? 'bg-white/20 text-white' : 'bg-black/10'
                   }`}>
-                    {count}
+                    {stepDisplay}
                   </span>
                 </button>
               );
             })
+          )}
+
+          {selectedCategory && (
+            <button
+              onClick={() => onSelectCategory(null)}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-xl text-[11px] font-medium text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer"
+              title="Clear entity filter"
+            >
+              <X className="w-3 h-3" />
+              <span>Reset</span>
+            </button>
           )}
 
           <button

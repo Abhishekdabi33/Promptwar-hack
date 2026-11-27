@@ -97,13 +97,14 @@ export default function DiffWorkspace({
   useEffect(() => {
     if (highlightedCategory && activeMatches.length > 0) {
       const catMatches = activeMatches.filter(m => m.type === highlightedCategory);
-      if (catMatches.length > 0 && currentEntityIndex < catMatches.length) {
-        const m = catMatches[currentEntityIndex];
+      if (catMatches.length > 0) {
+        const safeIdx = currentEntityIndex % catMatches.length;
+        const m = catMatches[safeIdx];
         scrollToLine(m.line);
         setSelectedMatch(m);
       }
     }
-  }, [highlightedCategory, currentEntityIndex]);
+  }, [highlightedCategory, currentEntityIndex, activeMatches]);
 
   const getPillColor = (type: EntityCategory, isWhitelisted = false) => {
     if (isWhitelisted) {
@@ -455,6 +456,14 @@ export default function DiffWorkspace({
                   </button>
 
                   <button
+                    onClick={onOpenInputHub}
+                    className="p-1 rounded-lg text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 transition-colors cursor-pointer"
+                    title="+ Add File or Document"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
                     onClick={onClearInput}
                     className="p-1 rounded-lg text-rose-600 hover:text-rose-800 hover:bg-rose-50 transition-colors cursor-pointer"
                     title="Clear input"
@@ -465,9 +474,12 @@ export default function DiffWorkspace({
               </div>
 
               <div className="flex items-center justify-between px-4 py-2 gap-2 min-w-0 bg-slate-50/50">
-                <div className="flex items-center gap-1.5 text-emerald-800 font-bold min-w-0">
+                <div className="flex items-center gap-2 text-emerald-800 font-bold min-w-0">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                   <span className="truncate">Sanitized Zero-Leakage Stream</span>
+                  <span className="px-2 py-0.2 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 whitespace-nowrap hidden sm:inline">
+                    {redactionMode === 'full' ? 'Full Mask' : redactionMode === 'partial' ? 'Partial Mask' : 'Consistent Pseudonym'}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-shrink-0">

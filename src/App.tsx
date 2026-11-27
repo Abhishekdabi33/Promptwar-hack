@@ -521,9 +521,20 @@ export default function App() {
             <CommandStrip
               result={sanitizedResult}
               selectedCategory={selectedCategory}
+              currentEntityIndex={currentEntityIndex}
               onSelectCategory={(cat) => {
-                setSelectedCategory(cat);
-                setCurrentEntityIndex(0);
+                if (!cat) {
+                  setSelectedCategory(null);
+                  setCurrentEntityIndex(0);
+                } else if (selectedCategory === cat) {
+                  const catMatches = (sanitizedResult?.matches || []).filter(m => m.type === cat && !whitelistedIds.has(m.id));
+                  if (catMatches.length > 0) {
+                    setCurrentEntityIndex((prev) => (prev + 1) % catMatches.length);
+                  }
+                } else {
+                  setSelectedCategory(cat);
+                  setCurrentEntityIndex(0);
+                }
               }}
               onOpenDrawer={() => setIsDrawerOpen(true)}
               activeDetectorCount={enabledTypes.size}
