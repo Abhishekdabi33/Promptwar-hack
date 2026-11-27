@@ -1,5 +1,6 @@
 # PII Shield — 100% Client-Side Privacy Engine & Local PII Sanitizer
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-black.svg?logo=vercel)](https://promptwar-beta.vercel.app)
 [![React](https://img.shields.io/badge/React-18.3-blue.svg)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-purple.svg)](https://vitejs.dev/)
@@ -9,6 +10,9 @@
 [![Testing](https://img.shields.io/badge/Tests-100%25_Passing-success.svg)](#3-how-the-solution-works)
 [![Privacy](https://img.shields.io/badge/Network_Egress-0_Bytes-success.svg)](#1-chosen-vertical)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+> **Live Production URL:** [https://promptwar-beta.vercel.app](https://promptwar-beta.vercel.app)  
+> **Direct Deployment URL:** [https://promptwar-h13nrneu0-medical-network.vercel.app](https://promptwar-h13nrneu0-medical-network.vercel.app)
 
 ---
 
