@@ -2,22 +2,22 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Copy, 
   Check, 
-  Code, 
   Eye, 
   FileText, 
   Table2, 
   ShieldCheck,
   ClipboardPaste,
-  UploadCloud,
+  Plus,
   Trash2,
   FileCode,
   FileSpreadsheet,
-  FileCheck,
-  Edit3
+  Edit3,
+  EyeOff,
+  Shuffle
 } from 'lucide-react';
 import TablePreview from './TablePreview';
 import { parseDelimitedTextToMatrix } from '../utils/fileHandlers';
-import { PIIMatch, BatchFile, EntityCategory } from '../types';
+import { PIIMatch, BatchFile, EntityCategory, RedactionMode } from '../types';
 
 interface DiffWorkspaceProps {
   rawText: string;
@@ -33,12 +33,11 @@ interface DiffWorkspaceProps {
   onCopySanitized: () => void;
   isCopied: boolean;
   tableMatrix?: string[][];
-  onPasteClipboard?: () => void;
-  onTriggerUpload?: () => void;
-  onClearInput?: () => void;
-  onLoadSample?: (sampleType: string) => void;
-  onDropFiles?: (files: FileList | File[]) => void;
-  isDragging?: boolean;
+  redactionMode: RedactionMode;
+  onChangeRedactionMode: (mode: RedactionMode) => void;
+  onOpenInputHub: () => void;
+  onPasteClipboard: () => void;
+  onClearInput: () => void;
 }
 
 export default function DiffWorkspace({
@@ -55,18 +54,16 @@ export default function DiffWorkspace({
   onCopySanitized,
   isCopied,
   tableMatrix,
+  redactionMode,
+  onChangeRedactionMode,
+  onOpenInputHub,
   onPasteClipboard,
-  onTriggerUpload,
-  onClearInput,
-  onLoadSample,
-  onDropFiles,
-  isDragging = false
+  onClearInput
 }: DiffWorkspaceProps) {
   const [viewMode, setViewMode] = useState<'edit' | 'inspect'>('inspect');
   const [showTablePreview, setShowTablePreview] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<PIIMatch | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-  const [isLocalDrag, setIsLocalDrag] = useState(false);
 
   const unifiedScrollRef = useRef<HTMLDivElement>(null);
 
@@ -307,120 +304,101 @@ export default function DiffWorkspace({
 
   const isEmpty = !rawText || rawText.trim() === '';
 
+  const modes: Array<{
+    id: RedactionMode;
+    label: string;
+    sub: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }> = [
+    { id: 'full', label: 'Full Mask', sub: '[REDACTED]', icon: EyeOff },
+    { id: 'partial', label: 'Partial Mask', sub: 'XXXX-1234', icon: Eye },
+    { id: 'pseudonym', label: 'Consistent Pseudonym', sub: 'TOKEN_01', icon: Shuffle }
+  ];
+
   return (
-    <div className="relative mb-5">
-      <div
-        onClick={onTriggerUpload}
-        onDragOver={(e) => { e.preventDefault(); setIsLocalDrag(true); }}
-        onDragLeave={() => setIsLocalDrag(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setIsLocalDrag(false);
-          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            onDropFiles?.(e.dataTransfer.files);
-          }
-        }}
-        className={`mb-2.5 px-3 py-1.5 rounded-xl border border-dashed transition-all cursor-pointer flex items-center justify-between gap-2 text-xs select-none ${
-          isLocalDrag || isDragging
-            ? 'border-indigo-500 bg-indigo-50/90 shadow-md ring-2 ring-indigo-400'
-            : 'border-slate-300 bg-slate-50/70 hover:bg-slate-100 hover:border-slate-400 text-slate-600'
-        }`}
-        title="Click to browse files or drop files anywhere"
-      >
-        <div className="flex items-center gap-2">
-          <UploadCloud className="w-4 h-4 text-indigo-600 flex-shrink-0 animate-pulse" />
-          <span className="font-medium text-slate-800">
-            Drop files anywhere or click to browse:
-          </span>
-          <div className="hidden sm:flex items-center gap-1">
-            {['TXT', 'CSV', 'XLSX', 'JSON', 'XML', 'DOCX', 'PDF', 'EML'].map((fmt) => (
-              <span
-                key={fmt}
-                className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-white border border-slate-200 text-slate-700 shadow-2xs"
-              >
-                .{fmt.toLowerCase()}
-              </span>
-            ))}
+    <div className="relative mb-3">
+      <div className="bg-white/80 backdrop-blur-xl rounded-3xl border border-white/90 shadow-sm ring-1 ring-slate-200/60 overflow-hidden flex flex-col">
+        <div className="px-4 py-2.5 border-b border-slate-200/80 bg-white/60 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+              Redaction Policy:
+            </span>
+            <div className="inline-flex p-0.5 bg-slate-100/90 rounded-xl border border-slate-200/70 gap-1 flex-wrap sm:flex-nowrap">
+              {modes.map((m) => {
+                const active = redactionMode === m.id;
+                const Icon = m.icon;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => onChangeRedactionMode(m.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap ${
+                      active
+                        ? 'bg-white text-indigo-900 shadow-2xs border border-slate-200/90 font-bold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                    <span>{m.label}</span>
+                    <span className="text-[10px] text-slate-400 font-mono hidden md:inline">
+                      ({m.sub})
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 justify-end">
+            <button
+              onClick={onOpenInputHub}
+              className="inline-flex items-center gap-1 px-3 py-1 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 shadow-2xs transition-all cursor-pointer whitespace-nowrap hover:border-indigo-300"
+            >
+              <Plus className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Add / Switch File</span>
+            </button>
           </div>
         </div>
-        <span className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 whitespace-nowrap">
-          Browse Files &rarr;
-        </span>
-      </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden flex flex-col">
         {isEmpty ? (
-          <div className="p-6 flex flex-col items-center justify-center min-h-[460px] bg-slate-50/30">
-            <div className="w-full max-w-2xl bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col gap-5">
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto mb-2.5">
-                  <ShieldCheck className="w-6 h-6 text-indigo-600" />
+          <div className="p-8 flex flex-col items-center justify-center min-h-[460px] bg-slate-50/30">
+            <div className="w-full max-w-xl bg-white/90 backdrop-blur-xl rounded-3xl border border-white/90 p-8 shadow-sm ring-1 ring-slate-200/70 flex flex-col gap-6 text-center">
+              <div>
+                <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto mb-3 text-indigo-600 shadow-xs">
+                  <ShieldCheck className="w-7 h-7" />
                 </div>
                 <h3 className="text-base font-bold text-slate-900">
                   Ready for Local Zero-Leakage Sanitization
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                  Paste raw sensitive text, drop any document or spreadsheet, or load one of our noisy test dossiers to test PII detection.
+                  Type sensitive text, paste from your clipboard, drop any document or spreadsheet, or load a noisy test scenario.
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between text-xs text-slate-500 font-semibold px-1">
-                  <span>Quick-Load Noisy Datasets</span>
-                  <span className="text-[11px] text-slate-400 font-normal">Real PII + false-positive checksum traps</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <button
-                    onClick={() => onLoadSample?.('mixed')}
-                    className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-indigo-50/60 hover:border-indigo-300 transition-all text-left cursor-pointer group"
-                  >
-                    <FileText className="w-4 h-4 text-indigo-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
-                    <div>
-                      <div className="text-xs font-bold text-slate-800">Incident Dossier</div>
-                      <div className="text-[10px] text-slate-400 font-mono">.txt (PAN, Aadhaar, Cards)</div>
-                    </div>
-                  </button>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={onPasteClipboard}
+                  className="flex items-center justify-center gap-2 p-3.5 rounded-2xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100/70 text-indigo-900 font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                >
+                  <ClipboardPaste className="w-4 h-4 text-indigo-600" />
+                  <span>Paste from Clipboard</span>
+                </button>
 
-                  <button
-                    onClick={() => onLoadSample?.('json')}
-                    className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-indigo-50/60 hover:border-indigo-300 transition-all text-left cursor-pointer group"
-                  >
-                    <FileCode className="w-4 h-4 text-blue-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
-                    <div>
-                      <div className="text-xs font-bold text-slate-800">API Event Log</div>
-                      <div className="text-[10px] text-slate-400 font-mono">.json (JWT, Secrets, IPs)</div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => onLoadSample?.('csv')}
-                    className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-indigo-50/60 hover:border-indigo-300 transition-all text-left cursor-pointer group"
-                  >
-                    <FileSpreadsheet className="w-4 h-4 text-emerald-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
-                    <div>
-                      <div className="text-xs font-bold text-slate-800">Customer Table</div>
-                      <div className="text-[10px] text-slate-400 font-mono">.csv (Tabular Ledgers)</div>
-                    </div>
-                  </button>
-                </div>
+                <button
+                  onClick={onOpenInputHub}
+                  className="flex items-center justify-center gap-2 p-3.5 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs shadow-2xs transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 text-indigo-600" />
+                  <span>Add Document / File</span>
+                </button>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-700 px-1">
-                  <span>Type or Paste Text Below:</span>
-                  <button
-                    onClick={onPasteClipboard}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
-                  >
-                    <ClipboardPaste className="w-3.5 h-3.5" />
-                    <span>Paste from Clipboard</span>
-                  </button>
-                </div>
+              <div className="flex flex-col gap-1.5 text-left">
+                <span className="text-xs font-semibold text-slate-700 px-1">Or Type Raw Text Directly:</span>
                 <textarea
                   value={rawText}
                   onChange={(e) => onChangeRawText(e.target.value)}
                   placeholder="Paste sensitive logs, resumes, support tickets, or clinical notes directly here to begin instant zero-leakage redaction..."
-                  className="w-full h-32 p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:bg-white resize-none"
+                  className="w-full h-32 p-3 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-xs text-slate-900 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:bg-white resize-none"
                   spellCheck={false}
                 />
               </div>
@@ -428,35 +406,35 @@ export default function DiffWorkspace({
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-b border-slate-200 bg-slate-50/90 text-xs">
-              <div className="flex items-center justify-between px-3.5 py-2 gap-2 min-w-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200/80 border-b border-slate-200/80 bg-slate-50/80 text-xs">
+              <div className="flex items-center justify-between px-4 py-2 gap-2 min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
-                  <FileText className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                  <FileText className="w-4 h-4 text-indigo-600 flex-shrink-0" />
                   <span className="font-bold text-slate-800 truncate" title={activeFile?.name || 'Raw Document Stream'}>
                     {activeFile?.name || 'Raw Document Stream'}
                   </span>
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold uppercase bg-slate-200 text-slate-700 flex-shrink-0">
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold uppercase bg-slate-200/90 text-slate-700 flex-shrink-0">
                     {activeFormat === 'text' ? 'txt' : activeFormat}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <div className="flex bg-slate-200/80 p-0.5 rounded-lg border border-slate-300/60">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <div className="flex bg-slate-200/80 p-0.5 rounded-xl border border-slate-300/60">
                     <button
                       onClick={() => setViewMode('edit')}
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded-md transition-all cursor-pointer whitespace-nowrap ${
+                      className={`flex items-center gap-1 px-2.5 py-0.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                         viewMode === 'edit'
                           ? 'bg-white text-slate-900 shadow-2xs font-bold'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
-                      title="Direct edit raw text"
+                      title="Edit raw text live"
                     >
                       <Edit3 className="w-3 h-3 text-indigo-600" />
-                      <span>Type / Edit</span>
+                      <span>Edit Text</span>
                     </button>
                     <button
                       onClick={() => setViewMode('inspect')}
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded-md transition-all cursor-pointer whitespace-nowrap ${
+                      className={`flex items-center gap-1 px-2.5 py-0.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                         viewMode === 'inspect'
                           ? 'bg-white text-slate-900 shadow-2xs font-bold'
                           : 'text-slate-600 hover:text-slate-900'
@@ -464,29 +442,21 @@ export default function DiffWorkspace({
                       title="View validated PII entity highlights"
                     >
                       <Eye className="w-3 h-3 text-indigo-600" />
-                      <span>X-Ray Highlights</span>
+                      <span>X-Ray View</span>
                     </button>
                   </div>
 
                   <button
                     onClick={onPasteClipboard}
-                    className="p-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                    className="p-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition-colors cursor-pointer"
                     title="Paste from clipboard"
                   >
                     <ClipboardPaste className="w-3.5 h-3.5" />
                   </button>
 
                   <button
-                    onClick={onTriggerUpload}
-                    className="p-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition-colors cursor-pointer"
-                    title="Upload new file"
-                  >
-                    <UploadCloud className="w-3.5 h-3.5" />
-                  </button>
-
-                  <button
                     onClick={onClearInput}
-                    className="p-1 rounded-md text-rose-600 hover:text-rose-800 hover:bg-rose-50 transition-colors cursor-pointer"
+                    className="p-1 rounded-lg text-rose-600 hover:text-rose-800 hover:bg-rose-50 transition-colors cursor-pointer"
                     title="Clear input"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -494,7 +464,7 @@ export default function DiffWorkspace({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between px-3.5 py-2 gap-2 min-w-0 bg-slate-50/50">
+              <div className="flex items-center justify-between px-4 py-2 gap-2 min-w-0 bg-slate-50/50">
                 <div className="flex items-center gap-1.5 text-emerald-800 font-bold min-w-0">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                   <span className="truncate">Sanitized Zero-Leakage Stream</span>
@@ -504,25 +474,25 @@ export default function DiffWorkspace({
                   {isTabular && (
                     <button
                       onClick={() => setShowTablePreview(!showTablePreview)}
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded-md border text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                      className={`flex items-center gap-1 px-2.5 py-0.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                         showTablePreview
                           ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
                           : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
                       <Table2 className="w-3 h-3" />
-                      <span>Table Grid</span>
+                      <span>Table View</span>
                     </button>
                   )}
 
                   <button
                     onClick={onCopySanitized}
-                    className="flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-md shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+                    className="flex items-center gap-1 px-3 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
                   >
                     {isCopied ? (
                       <>
                         <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="text-emerald-700">Copied!</span>
+                        <span className="text-emerald-700 font-bold">Copied!</span>
                       </>
                     ) : (
                       <>
@@ -545,12 +515,12 @@ export default function DiffWorkspace({
                   ref={unifiedScrollRef}
                   className="flex-1 overflow-y-auto divide-y divide-slate-100"
                 >
-                  <div className="sticky top-0 z-10 grid grid-cols-2 divide-x divide-slate-200 bg-slate-100/95 backdrop-blur-xs border-b border-slate-200 shadow-2xs">
-                    <div className="px-3.5 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <div className="sticky top-0 z-10 grid grid-cols-2 divide-x divide-slate-200/80 bg-slate-100/90 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
+                    <div className="px-4 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       <span>Original Untrusted Stream</span>
                       <span>{rawLines.length} lines</span>
                     </div>
-                    <div className="px-3.5 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100/95">
+                    <div className="px-4 py-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100/90">
                       <span className="text-emerald-700 flex items-center gap-1">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                         Sanitized Output Stream
@@ -560,8 +530,8 @@ export default function DiffWorkspace({
                   </div>
 
                   {viewMode === 'edit' ? (
-                    <div className="grid grid-cols-2 divide-x divide-slate-200 min-h-full">
-                      <div className="flex p-2 bg-slate-50/30">
+                    <div className="grid grid-cols-2 divide-x divide-slate-200/80 min-h-full">
+                      <div className="flex p-3 bg-slate-50/30">
                         <div className="select-none pr-3 text-right text-slate-300 font-mono text-[11px] leading-[22px] min-w-[34px] border-r border-slate-100 mr-2">
                           {rawLines.map((_, i) => (
                             <div key={i} className="leading-[22px]">{i + 1}</div>
@@ -575,7 +545,7 @@ export default function DiffWorkspace({
                           spellCheck={false}
                         />
                       </div>
-                      <div className="p-2 bg-white">
+                      <div className="p-3 bg-white">
                         {Array.from({ length: totalLines }).map((_, idx) => {
                           const lineNo = idx + 1;
                           const textLine = sanitizedLines[idx] ?? '';
@@ -602,11 +572,11 @@ export default function DiffWorkspace({
                           <div
                             key={`diff_row_${lineNo}`}
                             id={`diff_row_${lineNo}`}
-                            className="grid grid-cols-2 divide-x divide-slate-200 hover:bg-slate-50/60 transition-colors"
+                            className="grid grid-cols-2 divide-x divide-slate-200/80 hover:bg-slate-50/60 transition-colors"
                           >
                             <div 
                               onClick={() => setViewMode('edit')}
-                              className="flex items-start min-w-0 px-2 py-1 leading-[22px] bg-slate-50/20 cursor-text group"
+                              className="flex items-start min-w-0 px-3 py-1 leading-[22px] bg-slate-50/20 cursor-text"
                               title="Click to live-edit raw text"
                             >
                               <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
@@ -617,7 +587,7 @@ export default function DiffWorkspace({
                               </div>
                             </div>
 
-                            <div className="flex items-start min-w-0 px-2 py-1 leading-[22px] bg-white">
+                            <div className="flex items-start min-w-0 px-3 py-1 leading-[22px] bg-white">
                               <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
                                 {lineNo}
                               </span>
@@ -633,7 +603,7 @@ export default function DiffWorkspace({
                 </div>
 
                 <div 
-                  className="w-7 border-l border-slate-200 bg-[#F8FAFC] relative flex-shrink-0 select-none hidden md:block"
+                  className="w-7 border-l border-slate-200/80 bg-[#F8FAFC] relative flex-shrink-0 select-none hidden md:block"
                   title="PII Radar Scroll Minimap — click any marker to jump to line"
                 >
                   <div className="absolute top-1 left-0 right-0 text-[8px] font-bold text-center text-slate-400 uppercase tracking-tighter pointer-events-none">
@@ -667,7 +637,7 @@ export default function DiffWorkspace({
       {selectedMatch && (
         <div
           style={{ top: popoverPos.top, left: popoverPos.left }}
-          className="fixed z-50 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 p-4 animate-in fade-in zoom-in-95 duration-150"
+          className="fixed z-50 w-80 bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/90 ring-1 ring-slate-200/80 p-4 animate-in fade-in zoom-in-95 duration-150"
         >
           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
             <div className="flex items-center gap-1.5">

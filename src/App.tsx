@@ -1,25 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Header from './components/Header';
-import TelemetryDashboard from './components/TelemetryDashboard';
-import ControlBar from './components/ControlBar';
+import CommandStrip from './components/CommandStrip';
 import DiffWorkspace from './components/DiffWorkspace';
-import BatchQueueStrip from './components/BatchQueueStrip';
 import ExportBar from './components/ExportBar';
+import InputHubModal from './components/InputHubModal';
+import DetectorDrawer from './components/DetectorDrawer';
 import PromptLogTab from './components/PromptLogTab';
 import Toast from './components/Toast';
 import { 
   initPyodideWorker, 
   subscribeWorkerStatus, 
   processWithWorker, 
-  processCellsWithWorker,
   generateSampleWithWorker 
 } from './services/pyodideService';
 import { 
   detectFormat, 
   extractTextFromPdf, 
-  exportSanitizedPdf, 
-  parseXlsxWorkbook, 
-  rebuildXlsxWorkbook, 
   arrayBufferToBase64, 
   base64ToBlob, 
   downloadBlob, 
@@ -61,6 +57,8 @@ export default function App() {
   const [isCopied, setIsCopied] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isInputHubOpen, setIsInputHubOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [liveRawHash, setLiveRawHash] = useState<string>('');
   const [liveSanitizedHash, setLiveSanitizedHash] = useState<string>('');
 
@@ -294,42 +292,10 @@ export default function App() {
             name: file.name,
             size: file.size,
             format: 'docx',
-            rawText: res.sanitized_text || 'Processed DOCX Document',
-            sanitizedText: res.sanitized_text,
-            sanitizedBlob,
-            sanitizedFilename: `sanitized_${file.name}`,
-            result: res
-          });
-        } else if (fmt === 'xlsx') {
-          const { sheets, sheetNames } = await parseXlsxWorkbook(file);
-          const firstSheet = sheets[sheetNames[0]] || [];
-          const cellOptions = {
-            redaction_mode: redactionMode,
-            enabled_types: Array.from(enabledTypes),
-            custom_rules: customRules,
-            whitelisted_ids: []
-          };
-          const cellRes = await processCellsWithWorker({
-            matrix: firstSheet,
-            options: cellOptions,
-            pseudonymMap: sharedPseudonymMapRef.current,
-            counters: sharedCountersRef.current
-          });
-
-          const sanitizedSheets = { [sheetNames[0]]: cellRes.sanitized_matrix };
-          const sanitizedXlsxBlob = rebuildXlsxWorkbook(sanitizedSheets, sheetNames);
-
-          newBatch.push({
-            id: fileId,
-            name: file.name,
-            size: file.size,
-            format: 'xlsx',
-            rawText: firstSheet.map(r => r.join(',')).join('\n'),
-            sanitizedText: (cellRes.sanitized_matrix || []).map(r => r.join(',')).join('\n'),
-            sanitizedBlob: sanitizedXlsxBlob,
-            sanitizedFilename: `sanitized_${file.name}`,
-            tableMatrix: cellRes.sanitized_matrix,
-            result: cellRes as any
+            rawText: res.sanitized_text || 'DOCX XML structure processed',
+            rawFile: file,
+            sanitizedBlob: sanitizedBlob || undefined,
+            sanitizedText: res.sanitized_text
           });
         } else {
           const text = await file.text();
@@ -338,47 +304,52 @@ export default function App() {
             name: file.name,
             size: file.size,
             format: fmt,
-            rawText: text
+            rawText: text,
+            rawFile: file
           });
         }
-      } catch (e: any) {
-        addToast(`Failed to parse ${file.name}: ${e?.message || 'Error'}`, 'error');
+      } catch (err) {
+        addToast(`Failed to parse file: ${file.name}`, 'error');
       }
     }
 
     if (newBatch.length > 0) {
-      setBatchFiles(newBatch);
-      setActiveBatchIndex(0);
+      setBatchFiles(prev => [...prev, ...newBatch]);
+      const lastIdx = batchFiles.length;
+      setActiveBatchIndex(lastIdx);
       setRawText(newBatch[0].rawText);
       setWhitelistedIds(new Set());
       setSelectedCategory(null);
       setCurrentEntityIndex(0);
-      addToast(`Imported ${newBatch.length} ${newBatch.length === 1 ? 'file' : 'files'} into client-side pipeline!`);
+      addToast(`Added ${newBatch.length} file(s) to processing queue!`);
     }
   };
 
-  const handleSelectBatchFile = (index: number) => {
-    setActiveBatchIndex(index);
-    const target = batchFiles[index];
-    if (target) {
-      setRawText(target.rawText);
-      setWhitelistedIds(new Set());
-      setSelectedCategory(null);
-      setCurrentEntityIndex(0);
-    }
+  const handleSelectBatchFile = (idx: number) => {
+    if (idx < 0 || idx >= batchFiles.length) return;
+    setActiveBatchIndex(idx);
+    const targetFile = batchFiles[idx];
+    setRawText(targetFile.rawText);
+    setWhitelistedIds(new Set());
+    setSelectedCategory(null);
+    setCurrentEntityIndex(0);
   };
 
-  const handleRemoveBatchFile = (index: number) => {
-    const nextFiles = batchFiles.filter((_, i) => i !== index);
-    setBatchFiles(nextFiles);
-    if (nextFiles.length > 0) {
-      const nextIdx = Math.max(0, index - 1);
-      setActiveBatchIndex(nextIdx);
-      setRawText(nextFiles[nextIdx].rawText);
-    } else {
-      setRawText('');
-      setSanitizedResult(null);
-    }
+  const handleRemoveBatchFile = (idx: number) => {
+    setBatchFiles(prev => {
+      const updated = prev.filter((_, i) => i !== idx);
+      if (updated.length === 0) {
+        setRawText('');
+        setSanitizedResult(null);
+        setActiveBatchIndex(0);
+      } else if (activeBatchIndex >= updated.length) {
+        setActiveBatchIndex(updated.length - 1);
+        setRawText(updated[updated.length - 1].rawText);
+      } else {
+        setRawText(updated[activeBatchIndex].rawText);
+      }
+      return updated;
+    });
   };
 
   const handleToggleType = (type: string) => {
@@ -392,111 +363,63 @@ export default function App() {
 
   const handleAddCustomRule = (rule: CustomRule) => {
     setCustomRules(prev => [...prev, rule]);
-    addToast(`Added custom ${rule.type} rule: "${rule.value}"`);
+    addToast(`Added custom rule: ${rule.value}`);
   };
 
   const handleRemoveCustomRule = (id: string) => {
     setCustomRules(prev => prev.filter(r => r.id !== id));
   };
 
-  const handleToggleWhitelist = (matchId: string) => {
+  const handleToggleWhitelist = (id: string) => {
     setWhitelistedIds(prev => {
       const next = new Set(prev);
-      const isAlreadyWhite = next.has(matchId);
-      if (isAlreadyWhite) {
-        next.delete(matchId);
-        addToast('Re-applied redaction to selected match');
-      } else {
-        next.add(matchId);
-        addToast('Match whitelisted (preserved in output)');
-      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
   const handleCopySanitized = () => {
-    if (!sanitizedResult?.sanitized_text) return;
-    navigator.clipboard.writeText(sanitizedResult.sanitized_text);
+    const textToCopy = sanitizedResult?.sanitized_text || rawText;
+    navigator.clipboard.writeText(textToCopy);
     setIsCopied(true);
-    addToast('Sanitized output copied to clipboard!');
+    addToast('Sanitized clean text copied to clipboard!');
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const filteredMatches = (sanitizedResult?.matches || []).filter(m => {
-    if (whitelistedIds.has(m.id)) return false;
-    if (selectedCategory && m.type !== selectedCategory) return false;
-    return true;
-  });
-
-  const handleNavigateEntity = (direction: 'prev' | 'next') => {
-    if (filteredMatches.length === 0) return;
-    if (direction === 'next') {
-      setCurrentEntityIndex(prev => (prev + 1) % filteredMatches.length);
-    } else {
-      setCurrentEntityIndex(prev => (prev - 1 + filteredMatches.length) % filteredMatches.length);
-    }
-  };
-
   const handleDownloadSanitized = () => {
-    if (!sanitizedResult) return;
-    const baseName = activeFile?.name ? activeFile.name.replace(/\.[^/.]+$/, "") : "sanitized_document";
+    const textToDownload = sanitizedResult?.sanitized_text || rawText;
+    const cleanExt = (activeFormat || 'txt').trim().toLowerCase().replace(/^\./, '');
+    const ext = cleanExt === 'text' ? 'txt' : (cleanExt || 'txt');
+    const baseName = activeFile?.name ? activeFile.name.replace(/\.[^/.]+$/, "") : "document";
+    const filename = `sanitized_${baseName}.${ext}`;
 
-    if (activeFormat === 'pdf') {
-      exportSanitizedPdf(sanitizedResult.sanitized_text, `${baseName}_sanitized.pdf`);
-      addToast('Downloaded sanitized PDF via jsPDF!');
-    } else if (activeFormat === 'docx') {
-      if (activeFile?.sanitizedBlob) {
-        downloadBlob(activeFile.sanitizedBlob, `${baseName}_sanitized.docx`);
-      } else {
-        downloadText(sanitizedResult.sanitized_text, `${baseName}_sanitized.txt`);
-      }
-      addToast('Downloaded sanitized DOCX file!');
-    } else if (activeFormat === 'xlsx') {
-      if (activeFile?.sanitizedBlob) {
-        downloadBlob(activeFile.sanitizedBlob, `${baseName}_sanitized.xlsx`);
-      } else {
-        downloadText(sanitizedResult.sanitized_text, `${baseName}_sanitized.csv`);
-      }
-      addToast('Downloaded sanitized XLSX workbook!');
-    } else if (activeFormat === 'csv' || activeFormat === 'tsv') {
-      downloadText(sanitizedResult.sanitized_text, `${baseName}_sanitized.${activeFormat}`, 'text/csv');
-      addToast(`Downloaded sanitized .${activeFormat}!`);
-    } else if (activeFormat === 'json') {
-      downloadText(sanitizedResult.sanitized_text, `${baseName}_sanitized.json`, 'application/json');
-      addToast('Downloaded sanitized .json!');
-    } else if (activeFormat === 'xml') {
-      downloadText(sanitizedResult.sanitized_text, `${baseName}_sanitized.xml`, 'application/xml');
-      addToast('Downloaded sanitized .xml!');
-    } else if (activeFormat === 'eml') {
-      downloadText(sanitizedResult.sanitized_text, `${baseName}_sanitized.eml`, 'message/rfc822');
-      addToast('Downloaded sanitized .eml!');
-    } else {
-      downloadText(sanitizedResult.sanitized_text, `${baseName}_sanitized.txt`, 'text/plain');
-      addToast('Downloaded sanitized .txt!');
+    if (activeFormat === 'docx' && activeFile?.sanitizedBlob) {
+      downloadBlob(activeFile.sanitizedBlob, filename);
+      addToast('Downloaded sanitized .docx file!');
+      return;
     }
+
+    downloadText(textToDownload, filename);
+    addToast(`Downloaded sanitized .${ext} file!`);
   };
 
   const handleDownloadAuditReport = () => {
     if (!sanitizedResult) return;
     const auditObj = {
-      audit_meta: {
-        application: "PII Shield — Client-Side Zero-Server Sanitizer",
-        version: "2.6.0-wasm",
-        timestamp: new Date().toISOString(),
-        redaction_policy: redactionMode,
-        execution_environment: workerStatus.engine === 'python-wasm' ? 'Python 3.12 WebAssembly (Pyodide Web Worker)' : 'Client-Side Safe Engine'
+      system: "PII Shield Zero-Leakage Privacy Engine",
+      runtime: "Pyodide Python 3.12 Web Worker (WASM)",
+      timestamp: new Date().toISOString(),
+      raw_sha256: liveRawHash || sanitizedResult.raw_sha256,
+      sanitized_sha256: liveSanitizedHash || sanitizedResult.sanitized_sha256,
+      risk_assessment: {
+        score: sanitizedResult.risk_score,
+        tier: sanitizedResult.risk_tier,
+        compliance_frameworks: sanitizedResult.compliance_frameworks
       },
-      file_details: {
-        name: activeFile?.name || 'raw_input.txt',
-        format: activeFormat,
-        input_sha256: sanitizedResult.raw_sha256,
-        output_sha256: sanitizedResult.sanitized_sha256
-      },
-      risk_and_compliance: {
-        risk_score: sanitizedResult.risk_score,
-        risk_tier: sanitizedResult.risk_tier,
-        triggered_regulations: sanitizedResult.compliance_frameworks,
-        active_pii_matches_count: sanitizedResult.active_matches_count,
+      detection_metrics: {
+        total_sensitive_matches_found: sanitizedResult.matches?.length || 0,
+        active_matches_redacted: sanitizedResult.active_matches_count,
         whitelisted_matches_count: whitelistedIds.size,
         false_positive_traps_ignored: sanitizedResult.rejected_traps_count
       },
@@ -519,23 +442,6 @@ export default function App() {
     }, null, 2);
     downloadText(vaultJson, `pseudonym_vault_${Date.now()}.json`, 'application/json');
     addToast('Downloaded pseudonym vault dictionary!');
-  };
-
-  const handleDownloadAllZip = async () => {
-    if (batchFiles.length === 0) return;
-    try {
-      const filesToZip = batchFiles.map(f => ({
-        sanitizedFilename: `sanitized_${f.name}`,
-        sanitizedBlob: f.sanitizedBlob,
-        sanitizedText: f.sanitizedText || (f.id === activeFile?.id ? sanitizedResult?.sanitized_text : f.rawText)
-      }));
-
-      const zipBlob = await createBatchZip(filesToZip);
-      downloadBlob(zipBlob, `pii_shield_batch_${Date.now()}.zip`);
-      addToast('Downloaded complete batch as ZIP!');
-    } catch (err) {
-      addToast('Failed to create batch ZIP', 'error');
-    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -561,18 +467,41 @@ export default function App() {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="min-h-screen bg-[#F8FAFC] text-[#0F172A] relative flex flex-col"
+      className="min-h-screen text-[#0F172A] relative flex flex-col"
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          handleProcessIncomingFiles(e.target.files);
+          e.target.value = '';
+        }}
+      />
+
       {isDragging && (
-        <div className="fixed inset-0 z-50 bg-indigo-900/40 backdrop-blur-xs flex items-center justify-center p-6 border-4 border-dashed border-indigo-400 m-4 rounded-3xl animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl p-8 shadow-2xl text-center max-w-md">
-            <UploadCloud className="w-16 h-16 text-indigo-600 mx-auto mb-4 animate-bounce" />
+        <div 
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          className="fixed inset-0 z-50 bg-indigo-900/25 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-150"
+        >
+          <div className="bg-white/95 backdrop-blur-2xl rounded-3xl border-2 border-dashed border-indigo-500 p-10 text-center max-w-lg shadow-2xl ring-8 ring-indigo-500/10">
+            <UploadCloud className="w-14 h-14 text-indigo-600 mx-auto mb-3 animate-bounce" />
             <h3 className="text-lg font-bold text-slate-900 mb-1">
-              Drop Files to Sanitize Locally
+              Drop Document to Sanitize Locally
             </h3>
-            <p className="text-xs text-slate-500">
-              Supports TXT, CSV, TSV, XLSX, JSON, XML, DOCX, PDF, and EML. Processed 100% inside your browser Web Worker with 0 server uploads.
+            <p className="text-xs text-slate-600 mb-4 max-w-sm mx-auto">
+              Drop your .txt, .csv, .xlsx, .json, .docx, .pdf, or .eml file to sanitize locally with zero network requests.
             </p>
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {['.txt', '.csv', '.xlsx', '.json', '.xml', '.docx', '.pdf', '.eml'].map((ext) => (
+                <span key={ext} className="px-2 py-0.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs font-mono font-bold">
+                  {ext}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -581,11 +510,7 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         workerStatus={workerStatus}
-        onLoadSample={handleLoadSample}
-        onPasteClipboard={handlePasteClipboard}
-        onTriggerUpload={() => fileInputRef.current?.click()}
-        fileInputRef={fileInputRef}
-        onFileChange={(e) => handleProcessIncomingFiles(e.target.files)}
+        onOpenInputHub={() => setIsInputHubOpen(true)}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
@@ -593,34 +518,15 @@ export default function App() {
           <PromptLogTab />
         ) : (
           <>
-            <BatchQueueStrip
-              files={batchFiles}
-              activeFileIndex={activeBatchIndex}
-              onSelectFile={handleSelectBatchFile}
-              onRemoveFile={handleRemoveBatchFile}
-              onDownloadAllZip={handleDownloadAllZip}
-            />
-
-            <TelemetryDashboard
+            <CommandStrip
               result={sanitizedResult}
               selectedCategory={selectedCategory}
               onSelectCategory={(cat) => {
                 setSelectedCategory(cat);
                 setCurrentEntityIndex(0);
               }}
-              currentEntityIndex={currentEntityIndex}
-              onNavigateEntity={handleNavigateEntity}
-              filteredMatches={filteredMatches}
-            />
-
-            <ControlBar
-              redactionMode={redactionMode}
-              onChangeRedactionMode={setRedactionMode}
-              enabledTypes={enabledTypes}
-              onToggleType={handleToggleType}
-              customRules={customRules}
-              onAddCustomRule={handleAddCustomRule}
-              onRemoveCustomRule={handleRemoveCustomRule}
+              onOpenDrawer={() => setIsDrawerOpen(true)}
+              activeDetectorCount={enabledTypes.size}
             />
 
             <DiffWorkspace
@@ -637,12 +543,11 @@ export default function App() {
               onCopySanitized={handleCopySanitized}
               isCopied={isCopied}
               tableMatrix={activeFile?.tableMatrix}
+              redactionMode={redactionMode}
+              onChangeRedactionMode={setRedactionMode}
+              onOpenInputHub={() => setIsInputHubOpen(true)}
               onPasteClipboard={handlePasteClipboard}
-              onTriggerUpload={() => fileInputRef.current?.click()}
               onClearInput={handleClearInput}
-              onLoadSample={handleLoadSample}
-              onDropFiles={handleProcessIncomingFiles}
-              isDragging={isDragging}
             />
 
             <ExportBar
@@ -658,6 +563,33 @@ export default function App() {
           </>
         )}
       </main>
+
+      <InputHubModal
+        isOpen={isInputHubOpen}
+        onClose={() => setIsInputHubOpen(false)}
+        onTriggerUpload={() => fileInputRef.current?.click()}
+        onFileDrop={handleProcessIncomingFiles}
+        onPasteClipboard={handlePasteClipboard}
+        onStartBlank={() => {
+          handleClearInput();
+          setIsInputHubOpen(false);
+        }}
+        onLoadSample={handleLoadSample}
+        batchFiles={batchFiles}
+        activeBatchIndex={activeBatchIndex}
+        onSelectBatchFile={handleSelectBatchFile}
+        onRemoveBatchFile={handleRemoveBatchFile}
+      />
+
+      <DetectorDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        enabledTypes={enabledTypes}
+        onToggleType={handleToggleType}
+        customRules={customRules}
+        onAddCustomRule={handleAddCustomRule}
+        onRemoveCustomRule={handleRemoveCustomRule}
+      />
 
       <Toast toasts={toasts} onDismiss={removeToast} />
     </div>
