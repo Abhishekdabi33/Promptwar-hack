@@ -60,13 +60,19 @@ export default function DiffWorkspace({
   onPasteClipboard,
   onClearInput
 }: DiffWorkspaceProps) {
-  const [viewMode, setViewMode] = useState<'edit' | 'inspect'>('inspect');
+  const [viewMode, setViewMode] = useState<'edit' | 'inspect'>(rawText.trim() ? 'inspect' : 'edit');
   const [mobilePane, setMobilePane] = useState<'both' | 'raw' | 'sanitized'>('sanitized');
   const [showTablePreview, setShowTablePreview] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<PIIMatch | null>(null);
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   const unifiedScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!rawText.trim()) {
+      setViewMode('edit');
+    }
+  }, [rawText]);
 
   const trimmedRaw = useMemo(() => rawText.replace(/\r?\n$/, ''), [rawText]);
   const trimmedSanitized = useMemo(() => sanitizedText.replace(/\r?\n$/, ''), [sanitizedText]);
@@ -377,53 +383,6 @@ export default function DiffWorkspace({
           </div>
         </div>
 
-        {isEmpty ? (
-          <div className="p-8 flex flex-col items-center justify-center min-h-[460px] bg-slate-50/30">
-            <div className="w-full max-w-xl bg-white/90 backdrop-blur-xl rounded-3xl border border-white/90 p-8 shadow-sm ring-1 ring-slate-200/70 flex flex-col gap-6 text-center">
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto mb-3 text-indigo-600 shadow-xs">
-                  <ShieldCheck className="w-7 h-7" />
-                </div>
-                <h3 className="text-base font-bold text-slate-900">
-                  Ready for Local Zero-Leakage Sanitization
-                </h3>
-                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                  Type sensitive text, paste from your clipboard, drop any document or spreadsheet, or load a noisy test scenario.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={onPasteClipboard}
-                  className="flex items-center justify-center gap-2 p-3.5 rounded-2xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100/70 text-indigo-900 font-bold text-xs shadow-2xs transition-all cursor-pointer"
-                >
-                  <ClipboardPaste className="w-4 h-4 text-indigo-600" />
-                  <span>Paste from Clipboard</span>
-                </button>
-
-                <button
-                  onClick={onOpenInputHub}
-                  className="flex items-center justify-center gap-2 p-3.5 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs shadow-2xs transition-all cursor-pointer"
-                >
-                  <Plus className="w-4 h-4 text-indigo-600" />
-                  <span>Add Document / File</span>
-                </button>
-              </div>
-
-              <div className="flex flex-col gap-1.5 text-left">
-                <span className="text-xs font-semibold text-slate-700 px-1">Or Type Raw Text Directly:</span>
-                <textarea
-                  value={rawText}
-                  onChange={(e) => onChangeRawText(e.target.value)}
-                  placeholder="Paste sensitive logs, resumes, support tickets, or clinical notes directly here to begin instant zero-leakage redaction..."
-                  className="w-full h-32 p-3 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-xs text-slate-900 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:bg-white resize-none"
-                  spellCheck={false}
-                />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <>
             <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-b border-slate-200 bg-slate-50 text-xs">
               <div className="flex items-center justify-between px-4 py-2 gap-2 min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
@@ -516,7 +475,8 @@ export default function DiffWorkspace({
 
                   <button
                     onClick={onCopySanitized}
-                    className="flex items-center gap-1 px-3 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-3.5 py-1 text-xs font-bold text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-[0_3px_0_#cbd5e1] active:translate-y-[2px] active:shadow-[0_1px_0_#cbd5e1] transition-all cursor-pointer whitespace-nowrap"
+                    title="Copy sanitized clean text (Shortcut: Ctrl+Shift+C)"
                   >
                     {isCopied ? (
                       <>
@@ -527,6 +487,7 @@ export default function DiffWorkspace({
                       <>
                         <Copy className="w-3.5 h-3.5 text-slate-500" />
                         <span>Copy Clean Text</span>
+                        <span className="hidden xl:inline text-[10px] text-slate-400 font-mono">Ctrl+Shift+C</span>
                       </>
                     )}
                   </button>
@@ -613,20 +574,28 @@ export default function DiffWorkspace({
                         />
                       </div>
                       <div className={`p-3 bg-white ${mobilePane === 'raw' ? 'hidden md:block' : 'block'}`}>
-                        {Array.from({ length: totalLines }).map((_, idx) => {
-                          const lineNo = idx + 1;
-                          const textLine = sanitizedLines[idx] ?? '';
-                          return (
-                            <div key={`edit_san_${lineNo}`} className="flex items-start leading-[22px]">
-                              <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
-                                {lineNo}
-                              </span>
-                              <div className="flex-1 min-w-0 font-mono text-xs text-slate-800 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-                                {renderSanitizedLine(textLine, lineNo)}
+                        {!rawText.trim() ? (
+                          <div className="flex flex-col items-center justify-center h-48 text-center text-xs text-slate-400 italic">
+                            <ShieldCheck className="w-8 h-8 text-slate-300 mb-2 stroke-[1.5]" />
+                            <span>Sanitized clean text stream will render here in real time as you type...</span>
+                            <span className="text-[10px] text-slate-400 mt-1">Strictly 0 bytes transmitted • Local Pyodide Web Worker</span>
+                          </div>
+                        ) : (
+                          Array.from({ length: totalLines }).map((_, idx) => {
+                            const lineNo = idx + 1;
+                            const textLine = sanitizedLines[idx] ?? '';
+                            return (
+                              <div key={`edit_san_${lineNo}`} className="flex items-start leading-[22px]">
+                                <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
+                                  {lineNo}
+                                </span>
+                                <div className="flex-1 min-w-0 font-mono text-xs text-slate-800 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                                  {renderSanitizedLine(textLine, lineNo)}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -700,8 +669,6 @@ export default function DiffWorkspace({
                 </div>
               </div>
             )}
-          </>
-        )}
       </div>
 
       {selectedMatch && (

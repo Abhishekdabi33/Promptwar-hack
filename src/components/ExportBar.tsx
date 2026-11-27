@@ -87,7 +87,7 @@ export default function ExportBar({
           {redactionMode === 'pseudonym' && (
             <button
               onClick={onDownloadVault}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 hover:text-slate-900"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-[0_3px_0_#cbd5e1] active:translate-y-[2px] active:shadow-[0_1px_0_#cbd5e1] transition-all cursor-pointer whitespace-nowrap flex-shrink-0 hover:text-slate-900"
             >
               <Key className="w-3.5 h-3.5 text-slate-500" />
               <span>Pseudonym Key (.json)</span>
@@ -96,7 +96,7 @@ export default function ExportBar({
 
           <button
             onClick={onDownloadAuditReport}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-xs transition-colors cursor-pointer whitespace-nowrap flex-shrink-0 hover:text-slate-900"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-[0_3px_0_#cbd5e1] active:translate-y-[2px] active:shadow-[0_1px_0_#cbd5e1] transition-all cursor-pointer whitespace-nowrap flex-shrink-0 hover:text-slate-900"
           >
             <FileCheck2 className="w-3.5 h-3.5 text-slate-500" />
             <span>Audit Report (.json)</span>
@@ -104,7 +104,7 @@ export default function ExportBar({
 
           <button
             onClick={onDownloadSanitized}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs transition-all cursor-pointer whitespace-nowrap flex-shrink-0 active:scale-95"
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-[0_3px_0_#0f172a] active:translate-y-[2px] active:shadow-[0_1px_0_#0f172a] transition-all cursor-pointer whitespace-nowrap flex-shrink-0"
           >
             <Download className="w-3.5 h-3.5 text-white" />
             <span>Download Sanitized (.{displayExt})</span>

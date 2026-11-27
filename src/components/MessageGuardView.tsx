@@ -229,19 +229,19 @@ export default function MessageGuardView({
           <span className="text-xs text-slate-400 font-medium">Quick Examples:</span>
           <button
             onClick={() => loadExample('risky')}
-            className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+            className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-[0_2px_0_#cbd5e1] active:translate-y-[1px] active:shadow-[0_1px_0_#cbd5e1] transition-all cursor-pointer"
           >
             OTP & Password
           </button>
           <button
             onClick={() => loadExample('payment')}
-            className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+            className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-[0_2px_0_#cbd5e1] active:translate-y-[1px] active:shadow-[0_1px_0_#cbd5e1] transition-all cursor-pointer"
           >
             UPI & Card
           </button>
           <button
             onClick={() => loadExample('clean')}
-            className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+            className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-[0_2px_0_#cbd5e1] active:translate-y-[1px] active:shadow-[0_1px_0_#cbd5e1] transition-all cursor-pointer"
           >
             Clean Text
           </button>
@@ -407,7 +407,7 @@ export default function MessageGuardView({
                 <button
                   onClick={handleCopy}
                   disabled={!safeMessage.trim()}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-xs transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl shadow-[0_3px_0_#0f172a] active:translate-y-[2px] active:shadow-[0_1px_0_#0f172a] transition-all cursor-pointer"
                 >
                   {isCopied ? (
                     <>
