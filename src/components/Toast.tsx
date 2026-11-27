@@ -11,7 +11,11 @@ export default function Toast({ toasts = [], onDismiss }: ToastProps) {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+    <div 
+      aria-live="polite" 
+      role="status" 
+      className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"
+    >
       {toasts.map((toast) => {
         const Icon = toast.type === 'error' ? AlertCircle : toast.type === 'info' ? Info : CheckCircle2;
         const color = toast.type === 'error'
@@ -31,7 +35,8 @@ export default function Toast({ toasts = [], onDismiss }: ToastProps) {
             </div>
             <button
               onClick={() => onDismiss(toast.id)}
-              className="p-1 hover:bg-black/5 rounded-lg text-slate-500 hover:text-slate-800"
+              aria-label="Dismiss notification"
+              className="p-1 hover:bg-black/5 rounded-lg text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>

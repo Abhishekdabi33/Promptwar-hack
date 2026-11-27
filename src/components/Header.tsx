@@ -33,23 +33,16 @@ export default function Header({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
           <button
-            onClick={onToggleSidebar}
-            className="p-2 rounded-xl text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200/80 shadow-2xs transition-colors cursor-pointer"
-            title="Open navigation & tools menu"
-          >
-            <Menu className="w-4 h-4" />
-          </button>
-
-          <button
             onClick={onReturnHome}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200/80 rounded-xl shadow-2xs transition-colors cursor-pointer"
+            aria-label="Return to landing page"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200/80 rounded-xl shadow-2xs transition-colors cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-900"
             title="Return to Landing Page"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
             <span className="hidden sm:inline">Home</span>
           </button>
 
-          <div className="flex items-center gap-2 pl-1 border-l border-slate-200">
+          <div className="flex items-center gap-2 pl-1 sm:pl-2 border-l border-slate-200">
             <div className="w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center text-white shadow-2xs">
               <Shield className="w-4 h-4 stroke-[2.2]" />
             </div>
@@ -97,10 +90,20 @@ export default function Header({
 
           <button
             onClick={onOpenInputHub}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-[0_3px_0_#0f172a] active:translate-y-[2px] active:shadow-[0_1px_0_#0f172a] transition-all cursor-pointer whitespace-nowrap"
+            aria-label="Create new input or upload document"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-[0_3px_0_#0f172a] active:translate-y-[2px] active:shadow-[0_1px_0_#0f172a] transition-all cursor-pointer whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-900"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>New Input</span>
+          </button>
+
+          <button
+            onClick={onToggleSidebar}
+            aria-label="Open navigation and tools sidebar"
+            className="p-2 rounded-xl text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200/80 shadow-2xs transition-colors cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-900"
+            title="Open navigation & tools menu"
+          >
+            <Menu className="w-4 h-4" />
           </button>
         </div>
       </div>

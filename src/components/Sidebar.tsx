@@ -83,6 +83,17 @@ export default function Sidebar({
     } catch (e) {}
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
@@ -92,13 +103,13 @@ export default function Sidebar({
         onClick={onClose} 
       />
 
-      <div className="fixed inset-y-0 left-0 max-w-full flex">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
         <motion.div 
-          initial={{ x: -320 }}
+          initial={{ x: 340 }}
           animate={{ x: 0 }}
-          exit={{ x: -320 }}
+          exit={{ x: 340 }}
           transition={{ type: "spring", damping: 28, stiffness: 300 }}
-          className="w-80 bg-white/90 backdrop-blur-2xl border-r border-slate-200 shadow-2xl flex flex-col justify-between"
+          className="w-80 sm:w-88 bg-white/95 backdrop-blur-2xl border-l border-slate-200 shadow-2xl flex flex-col justify-between"
         >
           <div className="p-5 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/50">
             <div className="flex items-center gap-2.5">
@@ -113,7 +124,8 @@ export default function Sidebar({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              aria-label="Close navigation & tools drawer"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-900"
             >
               <X className="w-4 h-4" />
             </button>

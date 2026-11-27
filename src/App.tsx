@@ -303,7 +303,7 @@ export default function App() {
     clearTimeout(processTimeoutRef.current);
     processTimeoutRef.current = setTimeout(() => {
       runSanitization(rawText);
-    }, 150);
+    }, 200);
     return () => clearTimeout(processTimeoutRef.current);
   }, [rawText, runSanitization]);
 
@@ -334,7 +334,7 @@ export default function App() {
       } catch (err) {
         addToast('Message safety scan encountered an error', 'error');
       }
-    }, 150);
+    }, 200);
 
     return () => clearTimeout(guardTimeoutRef.current);
   }, [messageGuardText, appMode, redactionMode, enabledTypes, customRules]);

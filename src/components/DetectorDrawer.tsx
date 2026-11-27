@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   SlidersHorizontal, 
@@ -36,6 +36,15 @@ export default function DetectorDrawer({
 }: DetectorDrawerProps) {
   const [ruleInput, setRuleInput] = useState('');
   const [ruleType, setRuleType] = useState<'keyword' | 'regex'>('keyword');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -162,7 +171,8 @@ export default function DetectorDrawer({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+            aria-label="Close detectors and rules drawer"
+            className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-900"
           >
             <X className="w-4 h-4" />
           </button>

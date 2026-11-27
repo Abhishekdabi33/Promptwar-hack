@@ -425,7 +425,8 @@ export default function DiffWorkspace({
 
                   <button
                     onClick={onPasteClipboard}
-                    className="p-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition-colors cursor-pointer"
+                    aria-label="Paste from clipboard"
+                    className="p-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition-colors cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-900"
                     title="Paste from clipboard"
                   >
                     <ClipboardPaste className="w-3.5 h-3.5" />
@@ -433,7 +434,8 @@ export default function DiffWorkspace({
 
                   <button
                     onClick={onOpenInputHub}
-                    className="p-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition-colors cursor-pointer"
+                    aria-label="Add or switch file"
+                    className="p-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition-colors cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-900"
                     title="+ Add File or Document"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -441,7 +443,8 @@ export default function DiffWorkspace({
 
                   <button
                     onClick={onClearInput}
-                    className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                    aria-label="Clear input text"
+                    className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500"
                     title="Clear input"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -475,7 +478,8 @@ export default function DiffWorkspace({
 
                   <button
                     onClick={onCopySanitized}
-                    className="flex items-center gap-1.5 px-3.5 py-1 text-xs font-bold text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-[0_3px_0_#cbd5e1] active:translate-y-[2px] active:shadow-[0_1px_0_#cbd5e1] transition-all cursor-pointer whitespace-nowrap"
+                    aria-label="Copy sanitized clean text"
+                    className="flex items-center gap-1.5 px-3.5 py-1 text-xs font-bold text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-[0_3px_0_#cbd5e1] active:translate-y-[2px] active:shadow-[0_1px_0_#cbd5e1] transition-all cursor-pointer whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-900"
                     title="Copy sanitized clean text (Shortcut: Ctrl+Shift+C)"
                   >
                     {isCopied ? (
@@ -531,141 +535,150 @@ export default function DiffWorkspace({
                   </div>
                 </div>
 
-                <div 
-                  ref={unifiedScrollRef}
-                  className="flex-1 overflow-y-auto divide-y divide-slate-100 flex flex-col"
-                >
-                  <div className={`sticky top-0 z-10 grid ${
-                    mobilePane === 'both' ? 'grid-cols-2 divide-x' : 'grid-cols-1 md:grid-cols-2 md:divide-x'
-                  } divide-slate-200 bg-slate-100 border-b border-slate-200 shadow-2xs`}>
-                    <div className={`px-4 py-1.5 items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider ${
-                      mobilePane === 'sanitized' ? 'hidden md:flex' : 'flex'
-                    }`}>
-                      <span>Original Input</span>
-                      <span>{rawLines.length} lines</span>
-                    </div>
-                    <div className={`px-4 py-1.5 items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 ${
-                      mobilePane === 'raw' ? 'hidden md:flex' : 'flex'
-                    }`}>
-                      <span className="text-slate-800 flex items-center gap-1">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                        Sanitized Output
-                      </span>
-                      <span>{sanitizedLines.length} lines</span>
-                    </div>
-                  </div>
-
-                  {viewMode === 'edit' ? (
-                    <div className={`grid ${
+                <div className="flex flex-1 min-h-0 overflow-hidden relative">
+                  <div 
+                    ref={unifiedScrollRef}
+                    className="flex-1 overflow-y-auto divide-y divide-slate-100 flex flex-col"
+                  >
+                    <div className={`sticky top-0 z-10 grid ${
                       mobilePane === 'both' ? 'grid-cols-2 divide-x' : 'grid-cols-1 md:grid-cols-2 md:divide-x'
-                    } divide-slate-200/80 min-h-full flex-1`}>
-                      <div className={`p-3 bg-slate-50/30 ${mobilePane === 'sanitized' ? 'hidden md:flex' : 'flex'}`}>
-                        <div className="select-none pr-3 text-right text-slate-300 font-mono text-[11px] leading-[22px] min-w-[34px] border-r border-slate-100 mr-2">
-                          {rawLines.map((_, i) => (
-                            <div key={i} className="leading-[22px]">{i + 1}</div>
-                          ))}
-                        </div>
-                        <textarea
-                          value={rawText}
-                          onChange={(e) => onChangeRawText(e.target.value)}
-                          placeholder="Type or edit text live here..."
-                          className="flex-1 bg-transparent border-0 p-0 text-slate-900 font-mono text-xs leading-[22px] whitespace-pre-wrap break-words [overflow-wrap:anywhere] resize-none focus:outline-hidden"
-                          spellCheck={false}
-                        />
+                    } divide-slate-200 bg-slate-100 border-b border-slate-200 shadow-2xs`}>
+                      <div className={`px-4 py-1.5 items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider ${
+                        mobilePane === 'sanitized' ? 'hidden md:flex' : 'flex'
+                      }`}>
+                        <span>Original Input</span>
+                        <span>{rawLines.length} lines</span>
                       </div>
-                      <div className={`p-3 bg-white ${mobilePane === 'raw' ? 'hidden md:block' : 'block'}`}>
-                        {!rawText.trim() ? (
-                          <div className="flex flex-col items-center justify-center h-48 text-center text-xs text-slate-400 italic">
-                            <ShieldCheck className="w-8 h-8 text-slate-300 mb-2 stroke-[1.5]" />
-                            <span>Sanitized clean text stream will render here in real time as you type...</span>
-                            <span className="text-[10px] text-slate-400 mt-1">Strictly 0 bytes transmitted • Local Pyodide Web Worker</span>
+                      <div className={`px-4 py-1.5 items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-100 ${
+                        mobilePane === 'raw' ? 'hidden md:flex' : 'flex'
+                      }`}>
+                        <span className="text-slate-800 flex items-center gap-1">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          Sanitized Output
+                        </span>
+                        <span>{sanitizedLines.length} lines</span>
+                      </div>
+                    </div>
+
+                    {viewMode === 'edit' ? (
+                      <div className={`grid ${
+                        mobilePane === 'both' ? 'grid-cols-2 divide-x' : 'grid-cols-1 md:grid-cols-2 md:divide-x'
+                      } divide-slate-200/80 min-h-full flex-1`}>
+                        <div className={`p-3 bg-slate-50/30 ${mobilePane === 'sanitized' ? 'hidden md:flex' : 'flex'}`}>
+                          <div className="select-none pr-3 text-right text-slate-300 font-mono text-[11px] leading-[22px] min-w-[34px] border-r border-slate-100 mr-2">
+                            {rawLines.map((_, i) => (
+                              <div key={i} className="leading-[22px]">{i + 1}</div>
+                            ))}
                           </div>
-                        ) : (
-                          Array.from({ length: totalLines }).map((_, idx) => {
-                            const lineNo = idx + 1;
-                            const textLine = sanitizedLines[idx] ?? '';
-                            return (
-                              <div key={`edit_san_${lineNo}`} className="flex items-start leading-[22px]">
+                          <textarea
+                            value={rawText}
+                            onChange={(e) => onChangeRawText(e.target.value)}
+                            placeholder="Type or edit text live here..."
+                            className="flex-1 bg-transparent border-0 p-0 text-slate-900 font-mono text-xs leading-[22px] whitespace-pre-wrap break-words [overflow-wrap:anywhere] resize-none focus:outline-hidden"
+                            spellCheck={false}
+                          />
+                        </div>
+                        <div className={`p-3 bg-white ${mobilePane === 'raw' ? 'hidden md:block' : 'block'}`}>
+                          {!rawText.trim() ? (
+                            <div className="flex flex-col items-center justify-center h-full min-h-[320px] text-center p-6 text-xs text-slate-400">
+                              <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-center mb-3 shadow-2xs">
+                                <ShieldCheck className="w-6 h-6 text-slate-400 stroke-[1.8]" />
+                              </div>
+                              <span className="font-semibold text-slate-600 text-xs">
+                                Sanitized clean text stream will render here in real time as you type...
+                              </span>
+                              <span className="text-[10px] text-slate-400 mt-1 max-w-xs">
+                                Strictly 0 bytes transmitted • Local Pyodide Web Worker • SHA-256 Provenance
+                              </span>
+                            </div>
+                          ) : (
+                            Array.from({ length: totalLines }).map((_, idx) => {
+                              const lineNo = idx + 1;
+                              const textLine = sanitizedLines[idx] ?? '';
+                              return (
+                                <div key={`edit_san_${lineNo}`} className="flex items-start leading-[22px]">
+                                  <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
+                                    {lineNo}
+                                  </span>
+                                  <div className="flex-1 min-w-0 font-mono text-xs text-slate-800 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                                    {renderSanitizedLine(textLine, lineNo)}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        {Array.from({ length: totalLines }).map((_, idx) => {
+                          const lineNo = idx + 1;
+                          const rawLineText = rawLines[idx] ?? '';
+                          const sanLineText = sanitizedLines[idx] ?? '';
+                          return (
+                            <div
+                              key={`diff_row_${lineNo}`}
+                              id={`diff_row_${lineNo}`}
+                              className={`grid ${
+                                mobilePane === 'both' ? 'grid-cols-2 divide-x' : 'grid-cols-1 md:grid-cols-2 md:divide-x'
+                              } divide-slate-200/80 hover:bg-slate-50/60 transition-colors`}
+                            >
+                              <div 
+                                onClick={() => setViewMode('edit')}
+                                className={`items-start min-w-0 px-3 py-1 leading-[22px] bg-slate-50/20 cursor-text ${
+                                  mobilePane === 'sanitized' ? 'hidden md:flex' : 'flex'
+                                }`}
+                                title="Click to live-edit raw text"
+                              >
                                 <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
                                   {lineNo}
                                 </span>
-                                <div className="flex-1 min-w-0 font-mono text-xs text-slate-800 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-                                  {renderSanitizedLine(textLine, lineNo)}
+                                <div className="flex-1 min-w-0">
+                                  {renderInspectLine(rawLineText, lineNo)}
                                 </div>
                               </div>
-                            );
-                          })
-                        )}
+
+                              <div className={`items-start min-w-0 px-3 py-1 leading-[22px] bg-white ${
+                                mobilePane === 'raw' ? 'hidden md:flex' : 'flex'
+                              }`}>
+                                <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
+                                  {lineNo}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  {renderSanitizedLine(sanLineText, lineNo)}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    </div>
-                  ) : (
-                    <div>
-                      {Array.from({ length: totalLines }).map((_, idx) => {
-                        const lineNo = idx + 1;
-                        const rawLineText = rawLines[idx] ?? '';
-                        const sanLineText = sanitizedLines[idx] ?? '';
-                        return (
-                          <div
-                            key={`diff_row_${lineNo}`}
-                            id={`diff_row_${lineNo}`}
-                            className={`grid ${
-                              mobilePane === 'both' ? 'grid-cols-2 divide-x' : 'grid-cols-1 md:grid-cols-2 md:divide-x'
-                            } divide-slate-200/80 hover:bg-slate-50/60 transition-colors`}
-                          >
-                            <div 
-                              onClick={() => setViewMode('edit')}
-                              className={`items-start min-w-0 px-3 py-1 leading-[22px] bg-slate-50/20 cursor-text ${
-                                mobilePane === 'sanitized' ? 'hidden md:flex' : 'flex'
-                              }`}
-                              title="Click to live-edit raw text"
-                            >
-                              <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
-                                {lineNo}
-                              </span>
-                              <div className="flex-1 min-w-0">
-                                {renderInspectLine(rawLineText, lineNo)}
-                              </div>
-                            </div>
+                    )}
+                  </div>
 
-                            <div className={`items-start min-w-0 px-3 py-1 leading-[22px] bg-white ${
-                              mobilePane === 'raw' ? 'hidden md:flex' : 'flex'
-                            }`}>
-                              <span className="select-none text-right text-slate-300 font-mono text-[11px] min-w-[34px] pr-2.5 mr-2 flex-shrink-0 pt-0.5">
-                                {lineNo}
-                              </span>
-                              <div className="flex-1 min-w-0">
-                                {renderSanitizedLine(sanLineText, lineNo)}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <div 
-                  className="w-6 border-l border-slate-200 bg-slate-50 relative flex-shrink-0 select-none hidden md:block"
-                  title="Entity location minimap — click to jump to line"
-                >
-                  {activeMatches.map((m) => {
-                    const fraction = Math.min(0.96, Math.max(0.04, (m.line - 1) / Math.max(totalLines, 1)));
-                    const topPercent = (fraction * 100).toFixed(1);
-                    return (
-                      <button
-                        key={`radar_${m.id}`}
-                        onClick={() => scrollToLine(m.line)}
-                        style={{ top: `${topPercent}%` }}
-                        className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 flex items-center justify-center hover:scale-150 transition-transform cursor-pointer"
-                        title={`Line ${m.line}: ${m.type} ("${m.value}")`}
-                      >
-                        <span
-                          className="w-1.5 h-1.5 rounded-full shadow-2xs"
-                          style={{ backgroundColor: getDotColor(m.type) }}
-                        />
-                      </button>
-                    );
-                  })}
+                  <div 
+                    className="w-5 border-l border-slate-200 bg-slate-50 relative flex-shrink-0 select-none hidden md:block"
+                    title="Entity location minimap — click to jump to line"
+                  >
+                    {activeMatches.map((m) => {
+                      const fraction = Math.min(0.96, Math.max(0.04, (m.line - 1) / Math.max(totalLines, 1)));
+                      const topPercent = (fraction * 100).toFixed(1);
+                      return (
+                        <button
+                          key={`radar_${m.id}`}
+                          onClick={() => scrollToLine(m.line)}
+                          aria-label={`Jump to line ${m.line}: ${m.type}`}
+                          style={{ top: `${topPercent}%` }}
+                          className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 flex items-center justify-center hover:scale-150 transition-transform cursor-pointer"
+                          title={`Line ${m.line}: ${m.type} ("${m.value}")`}
+                        >
+                          <span
+                            className="w-1.5 h-1.5 rounded-full shadow-2xs"
+                            style={{ backgroundColor: getDotColor(m.type) }}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}

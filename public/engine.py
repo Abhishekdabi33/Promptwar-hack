@@ -515,7 +515,7 @@ class PIISanitizer:
             for rule in self.custom_rules:
                 rtype = rule.get('type', 'keyword')
                 rval = rule.get('value', '').strip()
-                if not rval:
+                if not rval or len(rval) > 200:
                     continue
                 try:
                     if rtype == 'keyword':

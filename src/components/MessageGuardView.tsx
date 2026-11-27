@@ -255,7 +255,8 @@ export default function MessageGuardView({
             <div className="flex items-center gap-1.5">
               <button
                 onClick={onPasteClipboard}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                aria-label="Paste message from clipboard"
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-900"
               >
                 <ClipboardPaste className="w-3.5 h-3.5 text-slate-500" />
                 <span>Paste</span>
@@ -263,7 +264,8 @@ export default function MessageGuardView({
               {messageText && (
                 <button
                   onClick={onClearMessage}
-                  className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                  aria-label="Clear message draft"
+                  className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500"
                   title="Clear message"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -288,7 +290,10 @@ export default function MessageGuardView({
         </div>
 
         <div className="flex flex-col gap-4">
-          <div className={`p-4 rounded-xl border shadow-xs transition-colors ${
+          <div 
+            aria-live="polite"
+            role="status"
+            className={`p-4 rounded-xl border shadow-xs transition-colors ${
             verdict.color === 'rose'
               ? 'bg-rose-50/70 border-rose-200 text-rose-950'
               : verdict.color === 'amber'
